@@ -19,13 +19,20 @@ def get_tests(series=None):
 
 
 @st.cache(ttl=60)
-def get_test_info(test_id):
+def get_test_info(test_ids):
     db = mongo_tilt_db()
-    test = db["test"].find_one(
-        {"_id": test_id},
-    )
 
-    return test
+    if isinstance(test_ids, str):
+        test_ids = [test_ids]
+
+    info = []
+    for test_id in test_ids:
+        test = db["test"].find_one(
+            {"_id": test_id},
+        )
+        info.append(test)
+
+    return info
 
 
 if __name__ == "__main__":

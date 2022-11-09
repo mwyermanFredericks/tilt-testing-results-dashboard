@@ -3,13 +3,13 @@ import pandas as pd
 import streamlit as st
 
 from .mongo.samples_db import get_samples
-from .mongo.tests_db import get_test_info, get_tests
+from .mongo.tests_db import get_test_info
 
 
 class SensorData:
     def __init__(self, test_ids: str | list[str]) -> None:
         self.test_ids = test_ids
-        self.sensor_mask = None
+        self.sensor_mask: list[str] | None = None
 
     @property
     def _raw_samples(self) -> pd.DataFrame:
@@ -17,6 +17,10 @@ class SensorData:
         if self.sensor_mask:
             samples = samples[samples["sensor_name"].isin(self.sensor_mask)]
         return samples
+
+    @property
+    def empty(self) -> bool:
+        return self._raw_samples.empty
 
     @property
     def test_info(self) -> dict:
@@ -35,6 +39,8 @@ class SensorData:
     @property
     def samples(self) -> pd.DataFrame:
         df = self._raw_samples.copy()
+        if df.empty:
+            return df
         df["error"] = df["degrees"] - df["stage_angle"]
         df["stage_error"] = df["stage_angle"] - df["set_angle"]
         df["series"] = df["sensor_name"].map(self.series_mapping)
@@ -43,6 +49,8 @@ class SensorData:
     @property
     def zeroed_samples(self) -> pd.DataFrame:
         df = self.samples.copy()
+        if df.empty:
+            return df
         zeroed_raw = pd.DataFrame(
             df.loc[df["set_angle"] == 0.0]
             .groupby(["sensor_name"])
@@ -82,6 +90,8 @@ class SensorData:
         return set_angles
 
     def _rep(self, set_angle_col: str) -> pd.DataFrame:
+        if self.empty:
+            return pd.DataFrame()
         set_repeatability_gb = self.zeroed_samples.groupby(
             [set_angle_col, "sensor_name"]
         )

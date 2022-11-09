@@ -1,11 +1,51 @@
+import streamlit as st
 import altair as alt
 import pandas as pd
-import streamlit as st
 
-from ...data import SensorData
+from results_dashboard.data import SensorData
+from results_dashboard.data.mongo import tests_db
+from results_dashboard.ui import samples, test_select
 
+# Sidebar/Multipage
 
-def generate_graph(data: SensorData, expected_accuracy: float | None) -> alt.Chart:
+st.set_page_config(
+    page_title="Accuracy",
+    page_icon=":line_chart:",
+        )
+st.sidebar.title("Accuracy")
+selected_ids = test_select.get_test_selection_sidebar()
+data = samples.show_samples_sidebar(selected_ids)
+
+# Main content
+
+st.header("Accuracy")
+st.write(
+    "Sensor accuracy is a test of how well the linearization algorithm "
+    "performs. It is calculated by taking the difference between the "
+    "sensor output and the set angle. The difference is then averaged "
+    "over all samples at each angle."
+)
+st.write(
+    "For bare sensors and unlinearized boards, this will be a measure "
+    "of how well the test performed the linearization. For linearized "
+    "boards, this will be a measure of how well the linearization "
+    "algorithm of the sensor itself performed. For this reason, this"
+    "test is normally only useful for linearized boards."
+)
+
+st.write(st.session_state)
+
+# Expected Accuracy
+
+expected_accuracy = st.number_input("Expected Accuracy")
+
+# By Sensor
+st.subheader("Accuracy by Sensor")
+
+if data.empty:
+    st.warning("No data to display")
+
+else:
     if expected_accuracy is not None and expected_accuracy > 0:
         spec_chart = (
             alt.Chart(pd.DataFrame({"Spec": [expected_accuracy]}))
@@ -54,10 +94,4 @@ def generate_graph(data: SensorData, expected_accuracy: float | None) -> alt.Cha
     if spec_chart is not None:
         chart += spec_chart
 
-    return chart.interactive()
-
-
-def display_graph(df: pd.DataFrame, expected_accuracy: float | None) -> None:
-    chart = generate_graph(df, expected_accuracy)
-    st.subheader("Accuracy by Sensor")
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart.interactive(), use_container_width=True)
