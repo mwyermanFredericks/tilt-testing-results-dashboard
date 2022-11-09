@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "tilt-testing-results-dashboard"
+version = "0.1.0"
+description = ""
+authors = ["Max Wyerman <mwyerman@frederickscompany.com>"]
+readme = "README.md"
+packages = [{include = "tilt_testing_results_dashboard"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pymongo = {extras = ["srv"], version = "^4.2.0"}
+pandas = "^1.5.0"
+streamlit = "^1.13.0"
+altair = "^4.2.0"
+scipy = "^1.9.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
