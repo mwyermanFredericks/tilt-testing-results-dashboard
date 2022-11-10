@@ -4,7 +4,7 @@ import pandas as pd
 
 from results_dashboard.data import SensorData
 from results_dashboard.data.mongo import tests_db
-from results_dashboard.ui import samples, test_select
+from results_dashboard.sidebar import show_sidebar
 
 # Sidebar/Multipage
 
@@ -12,9 +12,11 @@ st.set_page_config(
     page_title="Accuracy",
     page_icon=":line_chart:",
         )
-st.sidebar.title("Accuracy")
-selected_ids = test_select.get_test_selection_sidebar()
-data = samples.show_samples_sidebar(selected_ids)
+
+data = show_sidebar()
+
+st.sidebar.write("### Accuracy Options")
+expected_accuracy = st.sidebar.number_input("Expected Accuracy")
 
 # Main content
 
@@ -33,11 +35,8 @@ st.write(
     "test is normally only useful for linearized boards."
 )
 
-st.write(st.session_state)
-
 # Expected Accuracy
 
-expected_accuracy = st.number_input("Expected Accuracy")
 
 # By Sensor
 st.subheader("Accuracy by Sensor")

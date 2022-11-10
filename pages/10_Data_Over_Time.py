@@ -3,7 +3,7 @@ import altair as alt
 
 from results_dashboard.data import SensorData
 from results_dashboard.data.mongo import tests_db
-from results_dashboard.ui import samples, test_select
+from results_dashboard.sidebar import show_sidebar
 
 # Sidebar/Multipage
 
@@ -11,9 +11,8 @@ st.set_page_config(
     page_title="Data Over Time",
     page_icon=":line_chart:",
         )
-st.sidebar.title("Data Over Time")
-selected_ids = test_select.get_test_selection_sidebar()
-data = samples.show_samples_sidebar(selected_ids)
+
+data = show_sidebar()
 
 # Main content
 

@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import streamlit as st
+import numpy as sn
 
 from .mongo.samples_db import get_samples
 from .mongo.tests_db import get_test_info
@@ -35,6 +36,14 @@ class SensorData:
     @property
     def series_mapping(self) -> dict[str, str]:
         return {s: "-".join(s.split("-")[:-1]) for s in self.sensor_names}
+
+    @property
+    def series(self) -> list[str]:
+        return self.samples["series"].unique().tolist()
+
+    @property
+    def sensor_groups(self) -> list[str]:
+        return self.series
 
     @property
     def samples(self) -> pd.DataFrame:
