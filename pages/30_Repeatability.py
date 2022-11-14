@@ -2,7 +2,6 @@ import streamlit as st
 import altair as alt
 import pandas as pd
 
-from results_dashboard.sidebar import samples, test_select
 from results_dashboard.sidebar import show_sidebar
 
 # st.write("Work in progress")
@@ -15,7 +14,7 @@ st.set_page_config(
 data = show_sidebar()
 
 st.sidebar.write("### Repeatability Options")
-repeatability_zeroed = st.sidebar.checkbox("Use zeroed values", value=True, key="repeatability_zeroed")
+zeroed = st.sidebar.checkbox("Use zeroed values", value=True, key="zeroed")
 repeatability_expected = st.sidebar.number_input("Expected Repeatability", value=0.0, key="repeatability_expected", step=0.0001, format="%f")
 
 # Main content
@@ -50,7 +49,7 @@ if data.empty:
 else:
     sensors = st.selectbox("Select a sensor", ["All"] + data.sensor_names, key="repeatability_sensor")
 
-    df = data.repeatability_zeroed if repeatability_zeroed else data.repeatability
+    df = data.repeatability_zeroed if zeroed else data.repeatability
     if sensors != "All":
         df = df[df.sensor_name == sensors]
 
@@ -100,7 +99,7 @@ if data.empty:
 else:
     sensor_groups = st.selectbox("Select a sensor group", ["All"] + data.sensor_groups, key="repeatability_sensor_group")
 
-    df = data.series_repeatability_zeroed if repeatability_zeroed else data.series_repeatability
+    df = data.series_repeatability_zeroed if zeroed else data.series_repeatability
     if sensor_groups != "All":
         df = df[df.series == sensor_groups]
 
