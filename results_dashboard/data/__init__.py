@@ -152,9 +152,10 @@ class SensorData:
             acc_min,
             left_index=True,
             right_index=True,
-            suffixes=(".max", ".min"),
+            suffixes=("_max", "_min"),
         )
         acc = pd.merge(acc, acc_mean, left_index=True, right_index=True)
+        acc = acc.rename(columns={"error": "error_mean"})
         acc = acc.rename_axis(["angle", "sensor_name"]).reset_index()
         acc["series"] = acc["sensor_name"].map(self.series_mapping)
         return acc

@@ -56,14 +56,13 @@ else:
 
     df = data.accuracy
 
-    selection = alt.selection_multi(fields=["sensor_name"], bind="legend")
     chart = (
         alt.Chart(df)
         .mark_line()
         .encode(
             alt.X("angle", title="Set Angle (° tilt)"),
             alt.Y(
-                "error",
+                "error_max",
                 title="Error (±° tilt)",
                 scale=alt.Scale(type="log"),
             ),
@@ -81,13 +80,11 @@ else:
             tooltip=[
                 alt.Tooltip("sensor_name", title="Sensor"),
                 alt.Tooltip("angle", title="Set Angle"),
-                alt.Tooltip("error", title="Mean Error"),
-                alt.Tooltip("error.max", title="Maximum Error"),
-                alt.Tooltip("error.min", title="Minimum Error"),
+                alt.Tooltip("error_mean", title="Mean Error"),
+                alt.Tooltip("error_max", title="Maximum Error"),
+                alt.Tooltip("error_min", title="Minimum Error"),
             ],
-            opacity=alt.condition(selection, alt.value(1), alt.value(0.15)),
         )
-        .add_selection(selection)
     )
 
     if spec_chart is not None:
