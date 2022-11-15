@@ -1,16 +1,217 @@
 import numpy as np
 import pandas as pd
 import streamlit as st
+from typing import List, Union
 import numpy as sn
+from bson import ObjectId
 
 from .mongo.samples_db import get_samples
 from .mongo.tests_db import get_test_info
+from .mongo import mongo_tilt_db
+
+
+def get_test_repeatability(test_ids: Union[str, List[str]], sensor_mask: Union[None, List[str]] = None) -> pd.DataFrame:
+    db = mongo_tilt_db()
+    if isinstance(test_ids, str):
+        query_ids = [ObjectId(test_ids)]
+    else:
+        query_ids = [ObjectId(test_id) for test_id in test_ids]
+
+    test_query  = {
+        'test_id': {'$in': query_ids},
+    }
+
+    if isinstance(sensor_mask, str):
+        test_query['sensor_name'] = sensor_mask
+    elif isinstance(sensor_mask, list):
+        test_query['sensor_name'] = {'$in': sensor_mask}
+
+    aggregate_query = [
+        {
+            '$match': test_query,
+        }, {
+            '$group': {
+                '_id': {
+                    'angle': '$stage_data.set_angle', 
+                    'sensor_name': '$sensor_name'
+                }, 
+                'max_degrees': {
+                    '$max': '$sensor_data.degrees'
+                }, 
+                'min_degrees': {
+                    '$min': '$sensor_data.degrees'
+                }
+            }
+        }, {
+            '$addFields': {
+                'range': {
+                    '$sum': [
+                        '$max_degrees', {
+                            '$multiply': [
+                                -1, '$min_degrees'
+                            ]
+                        }
+                    ]
+                }
+            }
+        }, {
+            '$addFields': {
+                'repeatability': {
+                    '$divide': [
+                        '$range', 2
+                    ]
+                }
+            }
+        }
+    ]
+
+    df = pd.DataFrame(list(db["sample"].aggregate(
+        aggregate_query
+    )))
+    df.info()
+    df = df.drop('_id', axis=1).join(pd.DataFrame(df['_id'].tolist()))
+    
+    return df
 
 
 class SensorData:
     def __init__(self, test_ids: str | list[str]) -> None:
-        self.test_ids = test_ids
-        self.sensor_mask: list[str] | None = None
+        self._test_ids = test_ids if isinstance(test_ids, list) else [test_ids]
+        self._sensor_mask: list[str] | None = None
+
+    @property
+    def test_ids(self) -> list[str]:
+        if isinstance(self._test_ids, str):
+            return [self._test_ids]
+        return self._test_ids
+
+    @test_ids.setter
+    def test_ids(self, test_ids: str | list[str]) -> None:
+        self._test_ids = test_ids
+
+    @property
+    def sensor_mask(self) -> list[str] | None:
+        return self._sensor_mask
+    
+    @sensor_mask.setter
+    def sensor_mask(self, sensor_mask: list[str] | None) -> None:
+        self._sensor_mask = sensor_mask
+
+    @property
+    def _match_query(self) -> dict:
+        query_ids = [ObjectId(test_id) for test_id in self.test_ids]
+        query = {
+            '$match': {
+                'test_id': {'$in': query_ids}
+            }
+        }
+
+        if self.sensor_mask:
+            query['$match']['sensor_name'] = {'$in': self.sensor_mask}
+
+        return query
+
+    @property
+    def angle_data(self) -> pd.DataFrame:
+        db = mongo_tilt_db()
+        aggregate_query = [
+            self._match_query, {
+                '$group': {
+                    '_id': '$sample_time', 
+                    'stage_data': {
+                        '$first': '$stage_data'
+                    }
+                }
+            }, {
+                '$replaceRoot': {
+                    'newRoot': {
+                        '$mergeObjects': [
+                            '$$ROOT', '$stage_data'
+                        ]
+                    }
+                }
+            }, {
+                '$project': {
+                    'stage_data': 0
+                }
+            }, {
+                '$sort': {
+                    '_id': 1
+                }
+            }, {
+                '$group': {
+                    '_id': 0, 
+                    'document': {
+                        '$push': '$$ROOT'
+                    }
+                }
+            }, {
+                '$project': {
+                    'documentAndPrevAngle': {
+                        '$zip': {
+                            'inputs': [
+                                '$document', {
+                                    '$concatArrays': [
+                                        [
+                                            None
+                                        ], '$document.set_angle'
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            }, {
+                '$unwind': {
+                    'path': '$documentAndPrevAngle'
+                }
+            }, {
+                '$replaceWith': {
+                    '$mergeObjects': [
+                        {
+                            '$arrayElemAt': [
+                                '$documentAndPrevAngle', 0
+                            ]
+                        }, {
+                            'prev_angle': {
+                                '$arrayElemAt': [
+                                    '$documentAndPrevAngle', 1
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }, {
+                '$set': {
+                    'angle_difference': {
+                        '$subtract': [
+                            '$set_angle', '$prev_angle'
+                        ]
+                    }
+                }
+            }, {
+                '$match': {
+                    'angle_difference': {
+                        '$ne': 0
+                    }
+                }
+            }, {
+                '$project': {
+                    'prev_angle': 0,
+                    'angle_difference': 0
+                }
+            }, {
+                '$set': {
+                    'sample_time': '$_id'
+                }
+            }
+        ]
+
+        df = pd.DataFrame(list(db["sample"].aggregate(
+            aggregate_query
+        )))
+        
+        return df
 
     @property
     def _raw_samples(self) -> pd.DataFrame:
@@ -119,7 +320,52 @@ class SensorData:
 
     @property
     def repeatability(self) -> pd.DataFrame:
-        return self._rep("set_angle")
+        db = mongo_tilt_db()
+
+        aggregate_query = [
+            self._match_query,
+            {
+                '$group': {
+                    '_id': {
+                        'angle': '$stage_data.set_angle', 
+                        'sensor_name': '$sensor_name'
+                    }, 
+                    'max_degrees': {
+                        '$max': '$sensor_data.degrees'
+                    }, 
+                    'min_degrees': {
+                        '$min': '$sensor_data.degrees'
+                    }
+                }
+            }, {
+                '$addFields': {
+                    'range': {
+                        '$sum': [
+                            '$max_degrees', {
+                                '$multiply': [
+                                    -1, '$min_degrees'
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }, {
+                '$addFields': {
+                    'repeatability': {
+                        '$divide': [
+                            '$range', 2
+                        ]
+                    }
+                }
+            }
+        ]
+
+        df = pd.DataFrame(list(db["sample"].aggregate(
+            aggregate_query
+        )))
+        df = df.drop('_id', axis=1).join(pd.DataFrame(df['_id'].tolist()))
+        
+        return df
 
     @property
     def repeatability_zeroed(self) -> pd.DataFrame:
@@ -141,24 +387,50 @@ class SensorData:
 
     @property
     def accuracy(self) -> pd.DataFrame:
-        df = self.samples.copy()
-        df["error"] = abs(df["error"])
-        gb = df.groupby(["set_angle", "sensor_name"])
-        acc_max = pd.DataFrame(gb["error"].max())
-        acc_min = pd.DataFrame(gb["error"].min())
-        acc_mean = pd.DataFrame(gb["error"].mean())
-        acc = pd.merge(
-            acc_max,
-            acc_min,
-            left_index=True,
-            right_index=True,
-            suffixes=("_max", "_min"),
-        )
-        acc = pd.merge(acc, acc_mean, left_index=True, right_index=True)
-        acc = acc.rename(columns={"error": "error_mean"})
-        acc = acc.rename_axis(["angle", "sensor_name"]).reset_index()
-        acc["series"] = acc["sensor_name"].map(self.series_mapping)
-        return acc
+        db = mongo_tilt_db()
+
+        aggregate_query = [
+            self._match_query, {
+                '$addFields': {
+                    'error': {
+                        '$sum': [
+                            '$stage_data.stage_angle', {
+                                '$multiply': [
+                                    -1, '$sensor_data.degrees'
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }, {
+                '$group': {
+                    '_id': {
+                        'angle': '$stage_data.set_angle', 
+                        'sensor_name': '$sensor_name'
+                    }, 
+                    'max_error': {
+                        '$max': '$error'
+                    }, 
+                    'min_error': {
+                        '$min': '$error'
+                    }, 
+                    'mean_error': {
+                        '$avg': '$error'
+                    }, 
+                    'dev_error': {
+                        '$stdDevSamp': '$error'
+                    }
+                }
+            }
+        ]
+
+        df = pd.DataFrame(list(db["sample"].aggregate(
+            aggregate_query
+        )))
+        df.info()
+        df = df.drop('_id', axis=1).join(pd.DataFrame(df['_id'].tolist()))
+        
+        return df
 
     @property
     def series_repeatability(self) -> pd.DataFrame:

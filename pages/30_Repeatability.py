@@ -3,6 +3,7 @@ import altair as alt
 import pandas as pd
 
 from results_dashboard.sidebar import show_sidebar
+from results_dashboard.data import get_test_repeatability
 
 # st.write("Work in progress")
 
@@ -49,7 +50,10 @@ if data.empty:
 else:
     sensors = st.selectbox("Select a sensor", ["All"] + data.sensor_names, key="repeatability_sensor")
 
-    df = data.repeatability_zeroed if zeroed else data.repeatability
+
+    df = data.repeatability
+    # df = data.repeatability_zeroed if zeroed else data.repeatability
+    # st.write(df)
     if sensors != "All":
         df = df[df.sensor_name == sensors]
 
@@ -94,37 +98,37 @@ st.write("""
     in the title and is drawn as a horizontal red line on the graph.
     """)
 
-if data.empty:
-    st.warning("No data to display")
-else:
-    sensor_groups = st.selectbox("Select a sensor group", ["All"] + data.sensor_groups, key="repeatability_sensor_group")
-
-    df = data.series_repeatability_zeroed if zeroed else data.series_repeatability
-    if sensor_groups != "All":
-        df = df[df.series == sensor_groups]
-
-    chart = (
-        alt.Chart(df)
-        .mark_line()
-        .encode(
-            x=alt.X("angle", title="Angle (deg)"),
-            y=alt.Y("repeatability", title="Repeatability (deg)"),
-            color="series",
-            tooltip=["series", "angle", "repeatability"],
-        )
-        .interactive()
-    )
-
-    if repeatability_expected > 0:
-        chart += alt.Chart(pd.DataFrame({"Spec": [repeatability_expected]})).mark_rule().encode(y="Spec")
-
-    if sensor_groups != "All":
-        average_repeatability = df.repeatability.mean()
-        chart = chart.properties(title=f"{sensor_groups} Repeatability | Avg: {average_repeatability:.5f} deg")
-        chart += alt.Chart(pd.DataFrame({"Average": [average_repeatability]})).mark_rule().encode(y="Average", color=alt.value("red"))
-    else:
-        chart = chart.properties(title="Sensor Group Repeatability")
-
-    st.altair_chart(chart, use_container_width=True)
-
-
+# if data.empty:
+#     st.warning("No data to display")
+# else:
+#     sensor_groups = st.selectbox("Select a sensor group", ["All"] + data.sensor_groups, key="repeatability_sensor_group")
+#
+#     df = data.series_repeatability_zeroed if zeroed else data.series_repeatability
+#     if sensor_groups != "All":
+#         df = df[df.series == sensor_groups]
+#
+#     chart = (
+#         alt.Chart(df)
+#         .mark_line()
+#         .encode(
+#             x=alt.X("angle", title="Angle (deg)"),
+#             y=alt.Y("repeatability", title="Repeatability (deg)"),
+#             color="series",
+#             tooltip=["series", "angle", "repeatability"],
+#         )
+#         .interactive()
+#     )
+#
+#     if repeatability_expected > 0:
+#         chart += alt.Chart(pd.DataFrame({"Spec": [repeatability_expected]})).mark_rule().encode(y="Spec")
+#
+#     if sensor_groups != "All":
+#         average_repeatability = df.repeatability.mean()
+#         chart = chart.properties(title=f"{sensor_groups} Repeatability | Avg: {average_repeatability:.5f} deg")
+#         chart += alt.Chart(pd.DataFrame({"Average": [average_repeatability]})).mark_rule().encode(y="Average", color=alt.value("red"))
+#     else:
+#         chart = chart.properties(title="Sensor Group Repeatability")
+#
+#     st.altair_chart(chart, use_container_width=True)
+#
+#

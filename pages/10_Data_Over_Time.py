@@ -27,10 +27,13 @@ st.write(
 
 st.subheader("Set Angle vs Time")
 
+st.write(data.angle_data)
+
 if data.empty:
     st.warning("No data to show")
 else:
-    df = data.downsampled[["sample_time", "set_angle", "stage_angle"]]
+    # df = data.downsampled[["sample_time", "set_angle", "stage_angle"]]
+    df = data.angle_data
     chart = (
         alt.Chart(df)
         .mark_line()

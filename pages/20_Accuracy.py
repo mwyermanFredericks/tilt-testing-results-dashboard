@@ -18,6 +18,13 @@ data = show_sidebar()
 st.sidebar.write("### Accuracy Options")
 expected_accuracy = st.sidebar.number_input("Expected Accuracy")
 
+y_scale = st.sidebar.selectbox("Y-Axis Scale", ["linear", "log"])
+if y_scale == "linear":
+    scale = alt.Scale(type="linear")
+else:
+    scale = alt.Scale(type="symlog")
+
+
 # Main content
 
 st.header("Accuracy")
@@ -50,6 +57,10 @@ else:
             alt.Chart(pd.DataFrame({"Spec": [expected_accuracy]}))
             .mark_rule()
             .encode(y="Spec")
+        ) + (
+            alt.Chart(pd.DataFrame({"Spec": [-expected_accuracy]}))
+            .mark_rule()
+            .encode(y="Spec")
         )
     else:
         spec_chart = None
@@ -62,27 +73,30 @@ else:
         .encode(
             alt.X("angle", title="Set Angle (° tilt)"),
             alt.Y(
-                "error_max",
+                "mean_error",
                 title="Error (±° tilt)",
-                scale=alt.Scale(type="log"),
+                scale=scale,
             ),
             color=alt.Color(
                 "sensor_name",
-                legend=alt.Legend(
-                    title="Sensor",
-                    orient="none",
-                    direction="horizontal",
-                    legendX=15,
-                    legendY=450,
-                    columns=8,
-                ),
+                title="Sensor",
+            ),
+        ) + alt.Chart(df)
+        .mark_area(opacity=0.3)
+        .encode(
+            alt.X("angle", title="Set Angle (° tilt)"),
+            alt.Y("max_error", title="Error (±° tilt)"),
+            alt.Y2("min_error"),
+            color=alt.Color(
+                "sensor_name",
+                title="Sensor",
             ),
             tooltip=[
                 alt.Tooltip("sensor_name", title="Sensor"),
                 alt.Tooltip("angle", title="Set Angle"),
-                alt.Tooltip("error_mean", title="Mean Error"),
-                alt.Tooltip("error_max", title="Maximum Error"),
-                alt.Tooltip("error_min", title="Minimum Error"),
+                alt.Tooltip("mean_error", title="Mean Error"),
+                alt.Tooltip("max_error", title="Maximum Error"),
+                alt.Tooltip("min_error", title="Minimum Error"),
             ],
         )
     )
