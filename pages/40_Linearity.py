@@ -35,15 +35,15 @@ st.write("""
 if data.empty:
     st.warning("No data to display")
 else:
-    # if zeroed:
-    #     df = data.zeroed_samples
-    #     angle_col = "zeroed_set_angle"
-    # else:
-    #     df = data.samples
-    #     angle_col = "set_angle"
-    df = data.linearity(zeroed)
+
+
+    try:
+        df = data.linearity(zeroed)
+    except KeyError:
+        st.warning("Zeroing error. Showing unzeroed values")
+        df = data.linearity(False)
+
     angle_col = "angle"
-    st.write(df)
 
     if linear_range > 0:
         df = df[(df[angle_col] <= linear_range) & (df[angle_col] >= -linear_range)]
@@ -109,54 +109,79 @@ else:
     st.altair_chart(chart.interactive(), use_container_width=True)
 
 
-    # st.write("### By Group")
-    # st.write("""
-    #     The following plots show the linearity of each sensor group.
-    #
-    #     Different sensor groups can be selected using the dropdown menu.
-    #     If a group is selected, the plot will show the linear best fit line,
-    #     as well as a calculated R-squared value.
-    #
-    #     Currently, the R-squared and linear best fit line are calculated using
-    #     all of the data for each sensor concatenated together. This may result
-    #     in worst linearity results if the sensors do not have very similar
-    #     raw outputs over the given range.
-    #     """)
-    #
-    # groups = st.selectbox("Select a group", ["All"] + data.sensor_groups, key="linearity_group")
-    # if groups != "All":
-    #     group_df = df.loc[df.series == groups]
-    # else:
-    #     group_df = df
-    #
-    # chart = (
-    #     alt.Chart(group_df)
-    #     .mark_circle(size=60)
-    #     .encode(
-    #         x=alt.X(angle_col, title="Angle (deg)"),
-    #         y=alt.Y("raw", title="Raw Output"),
-    #         color=alt.Color("series", title="Sensor Group"),
-    #         tooltip=["series", angle_col, "raw"],
-    #     )
-    # )
-    #
-    # title = "Linearity"
-    # if linear_range > 0:
-    #     title += f" (+/-{linear_range} deg)"
-    #
-    # if groups != "All":
-    #     # calculate linear line of best fit
-    #     chart += (
-    #             chart
-    #             .transform_regression(angle_col, "raw", method="linear")
-    #             .mark_line(strokeDash=[5, 5])
-    #             .encode(
-    #                 alt.Color(legend=None)
-    #             )
-    #         )
-    #     title += f" | R-squared: {linregress(group_df[angle_col], group_df['raw']).rvalue**2:.5f}"
-    #
-    # chart = chart.properties(title=title)
-    #
-    #
-    # st.altair_chart(chart, use_container_width=True)
+    st.write("### By Group")
+    st.write("""
+        The following plots show the linearity of each sensor group.
+
+        Different sensor groups can be selected using the dropdown menu.
+        If a group is selected, the plot will show the linear best fit line,
+        as well as a calculated R-squared value.
+
+        Currently, the R-squared and linear best fit line are calculated using
+        all of the data for each sensor concatenated together. This may result
+        in worst linearity results if the sensors do not have very similar
+        raw outputs over the given range.
+        """)
+
+    groups = st.selectbox("Select a group", ["All"] + data.sensor_groups, key="linearity_group")
+
+    try:
+        df = data.linearity(zeroed, series=True)
+    except KeyError:
+        st.warning("Zeroing error. Showing unzeroed values")
+        df = data.linearity(False, series=True)
+
+    if linear_range > 0:
+        df = df[(df[angle_col] <= linear_range) & (df[angle_col] >= -linear_range)]
+
+    if groups != "All":
+        df = df.loc[df.series == groups]
+
+    chart = (
+        alt.Chart(df)
+        .mark_line()
+        .encode(
+            x=alt.X(angle_col, title="Angle (deg)"),
+            y=alt.Y("mean_raw", title="Raw Output"),
+            color=alt.Color("series", title="Sensor Group"),
+        )
+    )
+
+    title = "Linearity"
+    if linear_range > 0:
+        title += f" (+/-{linear_range} deg)"
+
+    if groups != "All":
+        # calculate linear line of best fit
+        chart += (
+                chart
+                .transform_regression(angle_col, "mean_raw", method="linear")
+                .mark_line(strokeDash=[5, 5], color="red")
+                .encode(
+                    alt.Color(legend=None)
+                )
+            )
+        title += f" | R-squared: {linregress(df[angle_col], df['mean_raw']).rvalue**2:.5f}"
+
+    chart += (
+        alt.Chart(df)
+        .mark_area(opacity=0.3)
+        .encode(
+            alt.X(angle_col, title="Angle (deg)"),
+            alt.Y("max_raw", title="Raw Output"),
+            alt.Y2("min_raw"),
+            color=alt.Color("series", title="Sensor Group"),
+            tooltip=[
+                alt.Tooltip("series", title="Sensor Group"),
+                alt.Tooltip(angle_col, title="Angle (deg)"),
+                alt.Tooltip("mean_raw", title="Raw Output"),
+                alt.Tooltip("max_raw", title="Max Raw Output"),
+                alt.Tooltip("min_raw", title="Min Raw Output"),
+            ],
+        )
+    )
+
+    chart = chart.properties(title=title)
+
+
+    st.altair_chart(chart, use_container_width=True)

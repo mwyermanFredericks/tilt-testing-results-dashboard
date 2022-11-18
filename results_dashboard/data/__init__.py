@@ -171,6 +171,146 @@ class SensorData:
         return df
 
     @property
+    def temperature_data(self) -> pd.DataFrame:
+        db = mongo_tilt_db()
+
+        aggregate_query = [
+            self._match_query, {
+                '$group': {
+                    '_id': {
+                        'year': {
+                            '$year': '$sample_time'
+                        },
+                        'month': {
+                            '$month': '$sample_time'
+                        },
+                        'day': {
+                            '$dayOfMonth': '$sample_time'
+                        },
+                        'hour': {
+                            '$hour': '$sample_time'
+                        },
+                        'minute': {
+                            '$minute': '$sample_time'
+                        }
+                    },
+                    'oven_set_temperature_max': {
+                        '$max': '$temperature_data.oven_set_temperature'
+                    },
+                    'oven_set_temperature_min': {
+                        '$min': '$temperature_data.oven_set_temperature'
+                    },
+                    'oven_set_temperature_mean': {
+                        '$avg': '$temperature_data.oven_set_temperature'
+                    },
+                    'oven_set_temperature_dev': {
+                        '$stdDevSamp': '$temperature_data.oven_set_temperature'
+                    },
+                    'oven_integrated_temperature_max': {
+                        '$max': '$temperature_data.oven_integrated_temperature'
+                    },
+                    'oven_integrated_temperature_min': {
+                        '$min': '$temperature_data.oven_integrated_temperature'
+                    },
+                    'oven_integrated_temperature_mean': {
+                        '$avg': '$temperature_data.oven_integrated_temperature'
+                    },
+                    'oven_integrated_temperature_dev': {
+                        '$stdDevSamp': '$temperature_data.oven_integrated_temperature'
+                    },
+                    'thermocouple_temperature_max': {
+                        '$max': '$temperature_data.thermocouple_temperature'
+                    },
+                    'thermocouple_temperature_min': {
+                        '$min': '$temperature_data.thermocouple_temperature'
+                    },
+                    'thermocouple_temperature_mean': {
+                        '$avg': '$temperature_data.thermocouple_temperature'
+                    },
+                    'thermocouple_temperature_dev': {
+                        '$stdDevSamp': '$temperature_data.thermocouple_temperature'
+                    },
+                    'ambient_temperature_max': {
+                        '$max': '$temperature_data.ambient_temperature'
+                    },
+                    'ambient_temperature_min': {
+                        '$min': '$temperature_data.ambient_temperature'
+                    },
+                    'ambient_temperature_mean': {
+                        '$avg': '$temperature_data.ambient_temperature'
+                    },
+                    'ambient_temperature_dev': {
+                        '$stdDevSamp': '$temperature_data.ambient_temperature'
+                    }
+                }
+            }, {
+                '$project': {
+                    '_id': 0,
+                    'sample_time': {
+                        '$dateFromParts': {
+                            'year': '$_id.year',
+                            'month': '$_id.month',
+                            'day': '$_id.day',
+                            'hour': '$_id.hour',
+                            'minute': '$_id.minute'
+                        }
+                    },
+                    'oven_integrated_temperature': {
+                        'source': 'integrated',
+                        'mean': '$oven_integrated_temperature_mean',
+                        'max': '$oven_integrated_temperature_max',
+                        'min': '$oven_integrated_temperature_min',
+                        'dev': '$oven_integrated_temperature_dev'
+                    },
+                    'oven_set_temperature': {
+                        'source': 'setpoint',
+                        'mean': '$oven_set_temperature_mean',
+                        'max': '$oven_set_temperature_max',
+                        'min': '$oven_set_temperature_min',
+                        'dev': '$oven_set_temperature_dev'
+                    },
+                    'thermocouple_temperature': {
+                        'source': 'thermocouple',
+                        'mean': '$thermocouple_temperature_mean',
+                        'max': '$thermocouple_temperature_max',
+                        'min': '$thermocouple_temperature_min',
+                        'dev': '$thermocouple_temperature_dev'
+                    },
+                    'ambient_temperature': {
+                        'source': 'ambient',
+                        'mean': '$ambient_temperature_mean',
+                        'max': '$ambient_temperature_max',
+                        'min': '$ambient_temperature_min',
+                        'dev': '$ambient_temperature_dev'
+                    }
+                }
+            }, {
+                '$project': {
+                    'sample_time': 1,
+                    'docs': [
+                        '$oven_integrated_temperature', '$oven_set_temperature', '$thermocouple_temperature', '$ambient_temperature'
+                    ]
+                }
+            }, {
+                '$unwind': {
+                    'path': '$docs'
+                }
+            }, {
+                '$project': {
+                    'sample_time': 1,
+                    'source': '$docs.source',
+                    'mean': '$docs.mean',
+                    'max': '$docs.max',
+                    'min': '$docs.min',
+                    'dev': '$docs.dev'
+                }
+            }
+        ]
+        return pd.DataFrame(list(db["sample"].aggregate(
+            aggregate_query
+        )))
+
+    @property
     @st.cache
     def empty(self) -> bool:
         db = mongo_tilt_db()
@@ -286,7 +426,21 @@ class SensorData:
         return df
 
     def linearity(self, zeroed: bool = False, series: bool = False) -> pd.DataFrame:
-        return self._linearity()
+        df = self._linearity().copy()
+
+        if zeroed:
+            df["zero"] = df["sensor_name"].map(self.zeroes["zero"])
+            df["angle"] = df["angle"] - df["zero"]
+
+        if series:
+            df["series"] = df["sensor_name"].map(self.series_mapping)
+            round_column(df, "angle", self.set_angles)
+            new_df = df.groupby(["series", "angle"]).mean()[["mean_raw"]].reset_index()
+            new_df["max_raw"] = df.groupby(["series", "angle"]).max()[["mean_raw"]].reset_index()["mean_raw"]
+            new_df["min_raw"] = df.groupby(["series", "angle"]).min()[["mean_raw"]].reset_index()["mean_raw"]
+            df = new_df
+
+        return df
 
     @st.cache
     def _repeatability(self) -> pd.DataFrame:
