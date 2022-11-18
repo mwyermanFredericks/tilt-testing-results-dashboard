@@ -8,11 +8,11 @@ packages = [{include = "results_dashboard"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pymongo = {extras = ["srv"], version = "^4.2.0"}
 pandas = "^1.5.0"
 streamlit = "^1.13.0"
 altair = "^4.2.0"
 scipy = "^1.9.2"
+pymongo = "^4.3.3"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.10.0"

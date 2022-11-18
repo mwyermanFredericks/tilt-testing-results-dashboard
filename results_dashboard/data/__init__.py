@@ -10,21 +10,23 @@ from .mongo.tests_db import get_test_info
 from .mongo import mongo_tilt_db
 
 
-def round_column(df: pd.DataFrame, column: str, round_to: pd.Series) -> pd.DataFrame:
+def round_column(df: pd.DataFrame, column: str, round_to: List[float]) -> pd.DataFrame:
     """Round a column of a datafram to the nearest value in a series."""
-    def round_to_nearest(x: float, round_to: list) -> float:
-        round_to_series = pd.Series(round_to)
-        exact = round_to_series.loc[round_to_series == x]
-        if not exact.empty:
-            return exact.iloc[0]
-        else:
-            min_val = round_to_series.loc[round_to_series < x].max()
-            max_val = round_to_series.loc[round_to_series > x].min()
-            if x - min_val < max_val - x:
-                return min_val
-            else:
-                return max_val
+    def round_to_nearest(value: float, values: list) -> float:
+      series = pd.Series(values, dtype=float)
+      exact = series.loc[series == value]
+      if not exact.empty:
+          return value
+      lo = series.loc[series < value].max()
+      hi = series.loc[series > value].min()
+      if value - lo < hi - value or pd.isna(hi):
+          return lo
+      else:
+          return hi
+
+    print(df)
     df[column] = df[column].map(lambda x: round_to_nearest(x, round_to))
+    print(df)
 
 
 
@@ -204,7 +206,8 @@ class SensorData:
         if self.empty:
             return []
         db = mongo_tilt_db()
-        return list(db["sample"].distinct("set_angle", self._match_query['$match']))
+        vals = list(db["sample"].distinct("stage_data.set_angle", self._match_query['$match']))
+        return vals
 
     @property
     @st.cache
@@ -240,10 +243,11 @@ class SensorData:
         ser = pd.DataFrame(list(db["sample"].aggregate(
             aggregate_query
         ))).rename(columns={"_id": "sensor_name"}).set_index("sensor_name")[['zero']]
+        print(ser)
         return ser
 
     @st.cache
-    def linearity(self, zeroed: bool = False) -> pd.DataFrame:
+    def _linearity(self, zeroed: bool = False) -> pd.DataFrame:
         db = mongo_tilt_db()
 
         aggregate_query = [
@@ -281,6 +285,10 @@ class SensorData:
         
         return df
 
+    def linearity(self, zeroed: bool = False, series: bool = False) -> pd.DataFrame:
+        return self._linearity()
+
+    @st.cache
     def _repeatability(self) -> pd.DataFrame:
         db = mongo_tilt_db()
 
@@ -329,7 +337,7 @@ class SensorData:
         return df
 
     def repeatability(self, zeroed: bool = False, series: bool = False) -> pd.DataFrame:
-        df = self._repeatability()
+        df = self._repeatability().copy()
 
         if zeroed:
             df["zero"] = df["sensor_name"].map(self.zeroes["zero"])
