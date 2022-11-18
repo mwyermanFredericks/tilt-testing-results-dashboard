@@ -49,7 +49,13 @@ if data.empty:
 else:
     sensors = st.selectbox("Select a sensor", ["All"] + data.sensor_names, key="repeatability_sensor")
 
-    df = data.repeatability_zeroed if zeroed else data.repeatability
+
+    try:
+        df = data.repeatability(zeroed)
+    except KeyError:
+        st.warning("Zeroing error. Showing unzeroed values")
+        df = data.repeatability()
+
     if sensors != "All":
         df = df[df.sensor_name == sensors]
 
@@ -58,7 +64,7 @@ else:
         .mark_line()
         .encode(
             x=alt.X("angle", title="Angle (deg)"),
-            y=alt.Y("repeatability", title="Repeatability (deg)"),
+            y=alt.Y("repeatability", title="Repeatability (deg)", scale=alt.Scale(type="log")),
             color="sensor_name",
             tooltip=["sensor_name", "angle", "repeatability"],
         )
@@ -99,7 +105,12 @@ if data.empty:
 else:
     sensor_groups = st.selectbox("Select a sensor group", ["All"] + data.sensor_groups, key="repeatability_sensor_group")
 
-    df = data.series_repeatability_zeroed if zeroed else data.series_repeatability
+    try:
+        df = data.repeatability(zeroed, series=True)
+    except KeyError:
+        st.warning("Zeroing error. Showing unzeroed values")
+        df = data.repeatability(series=True)
+
     if sensor_groups != "All":
         df = df[df.series == sensor_groups]
 
@@ -108,23 +119,42 @@ else:
         .mark_line()
         .encode(
             x=alt.X("angle", title="Angle (deg)"),
-            y=alt.Y("repeatability", title="Repeatability (deg)"),
-            color="series",
-            tooltip=["series", "angle", "repeatability"],
+            y=alt.Y("mean_repeatability", title="Repeatability (deg)", scale=alt.Scale(type="log")),
+            color=alt.Color(
+                "series", title="Sensor Group"
+                )
         )
-        .interactive()
-    )
+    ) 
+
+    if sensor_groups != "All":
+        chart += (
+            alt.Chart(df)
+            .mark_area(opacity=0.3)
+            .encode(
+                alt.X("angle", title="Angle (deg)"),
+                alt.Y("max_repeatability", title="Repeatability (deg)"),
+                alt.Y2("min_repeatability"),
+                color=alt.Color(
+                    "series", title="Sensor Group"
+                    ),
+                tooltip=[
+                    "series",
+                    "angle",
+                    "mean_repeatability"
+                ],
+            )
+        )
 
     if repeatability_expected > 0:
         chart += alt.Chart(pd.DataFrame({"Spec": [repeatability_expected]})).mark_rule().encode(y="Spec")
 
     if sensor_groups != "All":
-        average_repeatability = df.repeatability.mean()
-        chart = chart.properties(title=f"{sensor_groups} Repeatability | Avg: {average_repeatability:.5f} deg")
+        average_repeatability = df.mean_repeatability.mean()
+        chart = chart.properties(title=f"{sensor_groups} Repeatability | Avg: {average_repeatability:.6f} deg")
         chart += alt.Chart(pd.DataFrame({"Average": [average_repeatability]})).mark_rule().encode(y="Average", color=alt.value("red"))
     else:
         chart = chart.properties(title="Sensor Group Repeatability")
 
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart.interactive(), use_container_width=True)
 
 

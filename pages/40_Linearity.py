@@ -35,12 +35,15 @@ st.write("""
 if data.empty:
     st.warning("No data to display")
 else:
-    if zeroed:
-        df = data.zeroed_samples
-        angle_col = "zeroed_set_angle"
-    else:
-        df = data.samples
-        angle_col = "set_angle"
+
+
+    try:
+        df = data.linearity(zeroed)
+    except KeyError:
+        st.warning("Zeroing error. Showing unzeroed values")
+        df = data.linearity(False)
+
+    angle_col = "angle"
 
     if linear_range > 0:
         df = df[(df[angle_col] <= linear_range) & (df[angle_col] >= -linear_range)]
@@ -53,37 +56,57 @@ else:
         sensor_df = df
 
 
-    chart = (
+    avg_chart = (
         alt.Chart(sensor_df)
-        .mark_circle(size=60)
+        .mark_line()
         .encode(
             x=alt.X(angle_col, title="Angle (deg)"),
-            y=alt.Y("raw", title="Raw Output"),
+            y=alt.Y("mean_raw", title="Raw Output", scale=alt.Scale(zero=False)),
             color=alt.Color("sensor_name", title="Sensor"),
-            tooltip=["sensor_name", angle_col, "raw"],
+        )
+    ) 
+    area_chart = (
+        alt.Chart(sensor_df)
+        .mark_area(opacity=0.3)
+        .encode(
+            alt.X(angle_col, title="Angle (deg)"),
+            alt.Y("max_raw", title="Raw Output"),
+            alt.Y2("min_raw"),
+            color=alt.Color("sensor_name", title="Sensor"),
+            tooltip=[
+                alt.Tooltip("sensor_name", title="Sensor"),
+                alt.Tooltip("angle", title="Angle (deg)"),
+                alt.Tooltip("mean_raw", title="Raw Output"),
+                alt.Tooltip("max_raw", title="Max Raw Output"),
+                alt.Tooltip("min_raw", title="Min Raw Output"),
+                alt.Tooltip("dev_raw", title="Raw Output Std Deviation"),
+            ],
         )
     )
+
 
     title = "Linearity"
     if linear_range > 0:
         title += f" (+/-{linear_range} deg)"
 
     if sensors != "All":
+
         # calculate linear line of best fit
-        chart += (
-                chart
-                .transform_regression(angle_col, "raw", method="linear")
-                .mark_line(strokeDash=[5, 5])
-                .encode(
-                    alt.Color(legend=None)
-                )
+        avg_chart += (
+            avg_chart
+            .transform_regression(angle_col, "mean_raw", method="linear")
+            .mark_line(strokeDash=[5, 5], color="red")
+            .encode(
+                alt.Color(legend=None)
             )
-        title += f" | R-squared: {linregress(sensor_df[angle_col], sensor_df['raw']).rvalue**2:.5f}"
+        )
 
-    chart = chart.properties(title=title)
+        title += f" | R-squared: {linregress(sensor_df[angle_col], sensor_df['mean_raw']).rvalue**2:.5f}"
+
+    chart = (area_chart + avg_chart).properties(title=title)
 
 
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart.interactive(), use_container_width=True)
 
 
     st.write("### By Group")
@@ -101,19 +124,26 @@ else:
         """)
 
     groups = st.selectbox("Select a group", ["All"] + data.sensor_groups, key="linearity_group")
+
+    try:
+        df = data.linearity(zeroed, series=True)
+    except KeyError:
+        st.warning("Zeroing error. Showing unzeroed values")
+        df = data.linearity(False, series=True)
+
+    if linear_range > 0:
+        df = df[(df[angle_col] <= linear_range) & (df[angle_col] >= -linear_range)]
+
     if groups != "All":
-        group_df = df.loc[df.series == groups]
-    else:
-        group_df = df
+        df = df.loc[df.series == groups]
 
     chart = (
-        alt.Chart(group_df)
-        .mark_circle(size=60)
+        alt.Chart(df)
+        .mark_line()
         .encode(
             x=alt.X(angle_col, title="Angle (deg)"),
-            y=alt.Y("raw", title="Raw Output"),
+            y=alt.Y("mean_raw", title="Raw Output"),
             color=alt.Color("series", title="Sensor Group"),
-            tooltip=["series", angle_col, "raw"],
         )
     )
 
@@ -125,13 +155,31 @@ else:
         # calculate linear line of best fit
         chart += (
                 chart
-                .transform_regression(angle_col, "raw", method="linear")
-                .mark_line(strokeDash=[5, 5])
+                .transform_regression(angle_col, "mean_raw", method="linear")
+                .mark_line(strokeDash=[5, 5], color="red")
                 .encode(
                     alt.Color(legend=None)
                 )
             )
-        title += f" | R-squared: {linregress(group_df[angle_col], group_df['raw']).rvalue**2:.5f}"
+        title += f" | R-squared: {linregress(df[angle_col], df['mean_raw']).rvalue**2:.5f}"
+
+    chart += (
+        alt.Chart(df)
+        .mark_area(opacity=0.3)
+        .encode(
+            alt.X(angle_col, title="Angle (deg)"),
+            alt.Y("max_raw", title="Raw Output"),
+            alt.Y2("min_raw"),
+            color=alt.Color("series", title="Sensor Group"),
+            tooltip=[
+                alt.Tooltip("series", title="Sensor Group"),
+                alt.Tooltip(angle_col, title="Angle (deg)"),
+                alt.Tooltip("mean_raw", title="Raw Output"),
+                alt.Tooltip("max_raw", title="Max Raw Output"),
+                alt.Tooltip("min_raw", title="Min Raw Output"),
+            ],
+        )
+    )
 
     chart = chart.properties(title=title)
 
