@@ -10,68 +10,22 @@ from .mongo.tests_db import get_test_info
 from .mongo import mongo_tilt_db
 
 
-def get_test_repeatability(test_ids: Union[str, List[str]], sensor_mask: Union[None, List[str]] = None) -> pd.DataFrame:
-    db = mongo_tilt_db()
-    if isinstance(test_ids, str):
-        query_ids = [ObjectId(test_ids)]
-    else:
-        query_ids = [ObjectId(test_id) for test_id in test_ids]
+def round_column(df: pd.DataFrame, column: str, round_to: pd.Series) -> pd.DataFrame:
+    """Round a column of a datafram to the nearest value in a series."""
+    def round_to_nearest(x: float, round_to: list) -> float:
+        round_to_series = pd.Series(round_to)
+        exact = round_to_series.loc[round_to_series == x]
+        if not exact.empty:
+            return exact.iloc[0]
+        else:
+            min_val = round_to_series.loc[round_to_series < x].max()
+            max_val = round_to_series.loc[round_to_series > x].min()
+            if x - min_val < max_val - x:
+                return min_val
+            else:
+                return max_val
+    df[column] = df[column].map(lambda x: round_to_nearest(x, round_to))
 
-    test_query  = {
-        'test_id': {'$in': query_ids},
-    }
-
-    if isinstance(sensor_mask, str):
-        test_query['sensor_name'] = sensor_mask
-    elif isinstance(sensor_mask, list):
-        test_query['sensor_name'] = {'$in': sensor_mask}
-
-    aggregate_query = [
-        {
-            '$match': test_query,
-        }, {
-            '$group': {
-                '_id': {
-                    'angle': '$stage_data.set_angle', 
-                    'sensor_name': '$sensor_name'
-                }, 
-                'max_degrees': {
-                    '$max': '$sensor_data.degrees'
-                }, 
-                'min_degrees': {
-                    '$min': '$sensor_data.degrees'
-                }
-            }
-        }, {
-            '$addFields': {
-                'range': {
-                    '$sum': [
-                        '$max_degrees', {
-                            '$multiply': [
-                                -1, '$min_degrees'
-                            ]
-                        }
-                    ]
-                }
-            }
-        }, {
-            '$addFields': {
-                'repeatability': {
-                    '$divide': [
-                        '$range', 2
-                    ]
-                }
-            }
-        }
-    ]
-
-    df = pd.DataFrame(list(db["sample"].aggregate(
-        aggregate_query
-    )))
-    df.info()
-    df = df.drop('_id', axis=1).join(pd.DataFrame(df['_id'].tolist()))
-    
-    return df
 
 
 class SensorData:
@@ -112,6 +66,7 @@ class SensorData:
         return query
 
     @property
+    @st.cache
     def angle_data(self) -> pd.DataFrame:
         db = mongo_tilt_db()
         aggregate_query = [
@@ -210,29 +165,27 @@ class SensorData:
         df = pd.DataFrame(list(db["sample"].aggregate(
             aggregate_query
         )))
-        
+
         return df
 
     @property
-    def _raw_samples(self) -> pd.DataFrame:
-        samples = get_samples(self.test_ids)
-        if self.sensor_mask:
-            samples = samples[samples["sensor_name"].isin(self.sensor_mask)]
-        return samples
-
-    @property
+    @st.cache
     def empty(self) -> bool:
-        return self._raw_samples.empty
+        db = mongo_tilt_db()
+        return db["sample"].find_one(self._match_query['$match']) is None
 
+    # TODO
     @property
     def test_info(self) -> dict:
         return get_test_info(self.test_ids)
 
     @property
+    @st.cache
     def sensor_names(self) -> list[str]:
-        if self._raw_samples.empty:
+        if self.empty:
             return []
-        return self._raw_samples["sensor_name"].unique().tolist()
+        db = mongo_tilt_db()
+        return list(db["sample"].distinct("sensor_name", self._match_query['$match']))
 
     @property
     def series_mapping(self) -> dict[str, str]:
@@ -240,86 +193,95 @@ class SensorData:
 
     @property
     def series(self) -> list[str]:
-        return self.samples["series"].unique().tolist()
+        return list(set(self.series_mapping.values()))
 
     @property
     def sensor_groups(self) -> list[str]:
         return self.series
 
     @property
-    def samples(self) -> pd.DataFrame:
-        df = self._raw_samples.copy()
-        if df.empty:
-            return df
-        df["error"] = df["degrees"] - df["stage_angle"]
-        df["stage_error"] = df["stage_angle"] - df["set_angle"]
-        df["series"] = df["sensor_name"].map(self.series_mapping)
-        return df
-
-    @property
-    def zeroed_samples(self) -> pd.DataFrame:
-        df = self.samples.copy()
-        if df.empty:
-            return df
-        zeroed_raw = pd.DataFrame(
-            df.loc[df["set_angle"] == 0.0]
-            .groupby(["sensor_name"])
-            .mean(numeric_only=True)["raw"]
-        )
-        zeroed_raw["offset"] = 32767 - zeroed_raw["raw"]
-        df["raw_offset"] = df["sensor_name"].map(zeroed_raw["offset"])
-        df["zeroed_raw"] = df["raw"] + df["raw_offset"]
-
-        zeroed_stage_angle = pd.DataFrame(
-            df.loc[df["raw"].between(32767 - 2000, 32767 + 2000)]
-            .groupby(["sensor_name"])
-            .mean(numeric_only=True)["stage_angle"]
-        )
-        zeroed_stage_angle["offset"] = 0.0 - zeroed_stage_angle["stage_angle"]
-        df["stage_offset"] = df["sensor_name"].map(zeroed_stage_angle["offset"])
-        df["zeroed_stage_angle"] = df["stage_angle"] + df["stage_offset"]
-        df["zeroed_set_angle"] = df["set_angle"] + df["stage_offset"]
-        return df
-
-    @property
     def set_angles(self) -> pd.DataFrame:
-        df = self._raw_samples.copy()
-
-        # generate angles at normal intervals throughout the test
-        set_angles_temp = sorted(df["set_angle"].round(4).unique())
-        set_angles_temp_max = max(set_angles_temp)
-        set_angles_temp_min = min(set_angles_temp)
-        set_angles_temp_range = set_angles_temp_max - set_angles_temp_min
-        set_angles_temp = (
-            list(map(lambda x: x - set_angles_temp_range, set_angles_temp[:-1]))
-            + set_angles_temp
-            + list(map(lambda x: x + set_angles_temp_range, set_angles_temp[1:]))
-        )
-
-        set_angles = pd.Series([-np.inf] + set_angles_temp)
-        return set_angles
-
-    def _rep(self, set_angle_col: str) -> pd.DataFrame:
         if self.empty:
-            return pd.DataFrame()
-        set_repeatability_gb = self.zeroed_samples.groupby(
-            [set_angle_col, "sensor_name"]
-        )
-        sr_max = pd.DataFrame(set_repeatability_gb["degrees"].max())
-        sr_min = pd.DataFrame(set_repeatability_gb["degrees"].min())
-
-        rep = pd.merge(
-            sr_max, sr_min, left_index=True, right_index=True, suffixes=(".max", ".min")
-        )
-        rep = rep.rename_axis(["angle", "sensor_name"]).reset_index()
-        rep.index = rep["angle"].astype(str) + rep["sensor_name"]
-
-        rep["repeatability"] = (rep["degrees.max"] - rep["degrees.min"]) / 2
-        rep["series"] = rep["sensor_name"].map(self.series_mapping)
-        return rep
+            return []
+        db = mongo_tilt_db()
+        return list(db["sample"].distinct("set_angle", self._match_query['$match']))
 
     @property
-    def repeatability(self) -> pd.DataFrame:
+    @st.cache
+    def zeroes(self) -> pd.Series:
+        db = mongo_tilt_db()
+
+        aggregate_query = [
+            self._match_query,
+            {
+                '$match': {
+                    '$and': [
+                        {
+                            'sensor_data.raw': {
+                                '$gt': 30768
+                            }
+                        }, {
+                            'sensor_data.raw': {
+                                '$lt': 34768
+                            }
+                        }
+                    ]
+                }
+            }, {
+                '$group': {
+                    '_id': '$sensor_name', 
+                    'zero': {
+                        '$avg': '$stage_data.set_angle'
+                    }
+                }
+            }
+        ]
+
+        ser = pd.DataFrame(list(db["sample"].aggregate(
+            aggregate_query
+        ))).rename(columns={"_id": "sensor_name"}).set_index("sensor_name")[['zero']]
+        return ser
+
+    @st.cache
+    def linearity(self, zeroed: bool = False) -> pd.DataFrame:
+        db = mongo_tilt_db()
+
+        aggregate_query = [
+            self._match_query,
+            {
+                '$group': {
+                    '_id': {
+                        'angle': '$stage_data.set_angle', 
+                        'sensor_name': '$sensor_name'
+                    }, 
+                    'max_raw': {
+                        '$max': '$sensor_data.raw'
+                    }, 
+                    'min_raw': {
+                        '$min': '$sensor_data.raw'
+                    }, 
+                    'mean_raw': {
+                        '$avg': '$sensor_data.raw'
+                    }, 
+                    'dev_raw': {
+                        '$stdDevSamp': '$sensor_data.raw'
+                    }
+                }
+            }
+        ]
+
+        df = pd.DataFrame(list(db["sample"].aggregate(
+            aggregate_query
+        )))
+        df = df.drop('_id', axis=1).join(pd.DataFrame(df['_id'].tolist()))
+
+        if zeroed:
+            df["zero"] = df["sensor_name"].map(self.zeroes["zero"])
+            df["angle"] = df["angle"] - df["zero"]
+        
+        return df
+
+    def _repeatability(self) -> pd.DataFrame:
         db = mongo_tilt_db()
 
         aggregate_query = [
@@ -364,25 +326,24 @@ class SensorData:
             aggregate_query
         )))
         df = df.drop('_id', axis=1).join(pd.DataFrame(df['_id'].tolist()))
-        
         return df
 
-    @property
-    def repeatability_zeroed(self) -> pd.DataFrame:
-        return self._rep("zeroed_set_angle")
+    def repeatability(self, zeroed: bool = False, series: bool = False) -> pd.DataFrame:
+        df = self._repeatability()
 
-    def _series_rep(self, df: pd.DataFrame) -> pd.DataFrame:
-        set_angles = self.set_angles.copy()
-        set_angle_labels = set_angles.to_list()[1:]
-        df = df.copy()
-        df["angle"] = pd.cut(df["angle"], set_angles, labels=set_angle_labels).fillna(
-            set_angles.iloc[-1]
-        )
+        if zeroed:
+            df["zero"] = df["sensor_name"].map(self.zeroes["zero"])
+            df["angle"] = df["angle"] - df["zero"]
 
-        df = df.groupby(["angle", "series"]).mean(numeric_only=True)
-        df = df.dropna(how="all")
-        df = df.rename_axis(["angle", "series"]).reset_index()
-        df["angle"] = df["angle"].astype(float)
+        if series:
+            df["series"] = df["sensor_name"].map(self.series_mapping)
+            round_column(df, "angle", self.set_angles)
+            new_df = df.groupby(["series", "angle"]).mean()[["repeatability"]].reset_index()
+            new_df.rename(columns={"repeatability": "mean_repeatability"}, inplace=True)
+            new_df["max_repeatability"] = df.groupby(["series", "angle"]).max()[["repeatability"]].reset_index()["repeatability"]
+            new_df["min_repeatability"] = df.groupby(["series", "angle"]).min()[["repeatability"]].reset_index()["repeatability"]
+            df = new_df
+        
         return df
 
     @property
@@ -431,18 +392,3 @@ class SensorData:
         df = df.drop('_id', axis=1).join(pd.DataFrame(df['_id'].tolist()))
         
         return df
-
-    @property
-    def series_repeatability(self) -> pd.DataFrame:
-        return self._series_rep(self.repeatability)
-
-    @property
-    def series_repeatability_zeroed(self) -> pd.DataFrame:
-        return self._series_rep(self.repeatability_zeroed)
-
-    @property
-    def downsampled(self) -> pd.DataFrame:
-        df = self.samples.copy()
-        downsampled_df = df.resample("1T", on="sample_time").mean(numeric_only=True)
-        downsampled_df["sample_time"] = downsampled_df.index
-        return downsampled_df
