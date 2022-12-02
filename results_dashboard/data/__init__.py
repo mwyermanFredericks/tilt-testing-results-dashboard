@@ -1,32 +1,34 @@
 import numpy as np
 import pandas as pd
 import streamlit as st
-from typing import List, Union
-import numpy as sn
+from typing import List
 from bson import ObjectId
 
-from .mongo.samples_db import get_samples
 from .mongo.tests_db import get_test_info
 from .mongo import mongo_tilt_db
 
 
-def round_column(df: pd.DataFrame, column: str, round_to: List[float]) -> pd.DataFrame:
+def round_column(df: pd.DataFrame, column: str, round_to: List[float]) -> pd.Series:
     """Round a column of a datafram to the nearest value in a series."""
     def round_to_nearest(value: float, values: list) -> float:
-      series = pd.Series(values, dtype=float)
-      exact = series.loc[series == value]
-      if not exact.empty:
-          return value
-      lo = series.loc[series < value].max()
-      hi = series.loc[series > value].min()
-      if value - lo < hi - value or pd.isna(hi):
-          return lo
-      else:
-          return hi
+        series = pd.Series(values, dtype=float)
+        exact = series.loc[series == value]
+        if not exact.empty:
+            return value
+        rvalue = round(float(value), 6)
+        lo = float(series.loc[series < value].max())
+        hi = float(series.loc[series > value].min())
+        lodiff = round(rvalue - lo, 6)
+        hidiff = round(hi - rvalue, 6)
 
-    print(df)
+        if hidiff <= lodiff:
+            ret = hi
+        else:
+            ret = lo
+
+        return ret
+
     df[column] = df[column].map(lambda x: round_to_nearest(x, round_to))
-    print(df)
 
 
 
@@ -43,12 +45,12 @@ class SensorData:
 
     @test_ids.setter
     def test_ids(self, test_ids: str | list[str]) -> None:
-        self._test_ids = test_ids
+        self._test_ids = test_ids if isinstance(test_ids, list) else [test_ids]
 
     @property
     def sensor_mask(self) -> list[str] | None:
         return self._sensor_mask
-    
+
     @sensor_mask.setter
     def sensor_mask(self, sensor_mask: list[str] | None) -> None:
         self._sensor_mask = sensor_mask
@@ -68,13 +70,13 @@ class SensorData:
         return query
 
     @property
-    @st.cache
+    @st.cache(ttl=60)
     def angle_data(self) -> pd.DataFrame:
         db = mongo_tilt_db()
         aggregate_query = [
             self._match_query, {
                 '$group': {
-                    '_id': '$sample_time', 
+                    '_id': '$sample_time',
                     'stage_data': {
                         '$first': '$stage_data'
                     }
@@ -97,7 +99,7 @@ class SensorData:
                 }
             }, {
                 '$group': {
-                    '_id': 0, 
+                    '_id': 0,
                     'document': {
                         '$push': '$$ROOT'
                     }
@@ -171,6 +173,7 @@ class SensorData:
         return df
 
     @property
+    @st.cache(ttl=60)
     def temperature_data(self) -> pd.DataFrame:
         db = mongo_tilt_db()
 
@@ -288,7 +291,10 @@ class SensorData:
                 '$project': {
                     'sample_time': 1,
                     'docs': [
-                        '$oven_integrated_temperature', '$oven_set_temperature', '$thermocouple_temperature', '$ambient_temperature'
+                        '$oven_integrated_temperature',
+                        '$oven_set_temperature',
+                        '$thermocouple_temperature',
+                        '$ambient_temperature'
                     ]
                 }
             }, {
@@ -311,7 +317,7 @@ class SensorData:
         )))
 
     @property
-    @st.cache
+    @st.cache(ttl=60)
     def empty(self) -> bool:
         db = mongo_tilt_db()
         return db["sample"].find_one(self._match_query['$match']) is None
@@ -322,7 +328,7 @@ class SensorData:
         return get_test_info(self.test_ids)
 
     @property
-    @st.cache
+    @st.cache(ttl=60)
     def sensor_names(self) -> list[str]:
         if self.empty:
             return []
@@ -342,52 +348,26 @@ class SensorData:
         return self.series
 
     @property
+    @st.cache(ttl=60)
     def set_angles(self) -> pd.DataFrame:
         if self.empty:
             return []
         db = mongo_tilt_db()
         vals = list(db["sample"].distinct("stage_data.set_angle", self._match_query['$match']))
-        return vals
+        return [round(v, 6) for v in vals]
 
     @property
-    @st.cache
+    @st.cache(ttl=60)
     def zeroes(self) -> pd.Series:
-        db = mongo_tilt_db()
+        df = self._linearity()
+        df = df.loc[(df["mean_raw"] > 32768 - 6000) & (df["mean_raw"] < 32768 + 6000)]
+        ser = df.groupby("sensor_name").mean().reset_index()[["angle", "sensor_name"]].set_index("sensor_name")["angle"]
+        ser.name = "zero"
 
-        aggregate_query = [
-            self._match_query,
-            {
-                '$match': {
-                    '$and': [
-                        {
-                            'sensor_data.raw': {
-                                '$gt': 30768
-                            }
-                        }, {
-                            'sensor_data.raw': {
-                                '$lt': 34768
-                            }
-                        }
-                    ]
-                }
-            }, {
-                '$group': {
-                    '_id': '$sensor_name', 
-                    'zero': {
-                        '$avg': '$stage_data.set_angle'
-                    }
-                }
-            }
-        ]
-
-        ser = pd.DataFrame(list(db["sample"].aggregate(
-            aggregate_query
-        ))).rename(columns={"_id": "sensor_name"}).set_index("sensor_name")[['zero']]
-        print(ser)
         return ser
 
-    @st.cache
-    def _linearity(self, zeroed: bool = False) -> pd.DataFrame:
+    @st.cache(ttl=60)
+    def _linearity(self) -> pd.DataFrame:
         db = mongo_tilt_db()
 
         aggregate_query = [
@@ -395,18 +375,18 @@ class SensorData:
             {
                 '$group': {
                     '_id': {
-                        'angle': '$stage_data.set_angle', 
+                        'angle': '$stage_data.set_angle',
                         'sensor_name': '$sensor_name'
-                    }, 
+                    },
                     'max_raw': {
                         '$max': '$sensor_data.raw'
-                    }, 
+                    },
                     'min_raw': {
                         '$min': '$sensor_data.raw'
-                    }, 
+                    },
                     'mean_raw': {
                         '$avg': '$sensor_data.raw'
-                    }, 
+                    },
                     'dev_raw': {
                         '$stdDevSamp': '$sensor_data.raw'
                     }
@@ -419,30 +399,31 @@ class SensorData:
         )))
         df = df.drop('_id', axis=1).join(pd.DataFrame(df['_id'].tolist()))
 
-        if zeroed:
-            df["zero"] = df["sensor_name"].map(self.zeroes["zero"])
-            df["angle"] = df["angle"] - df["zero"]
-        
+        df["angle"].round(6)
+
         return df
 
     def linearity(self, zeroed: bool = False, series: bool = False) -> pd.DataFrame:
         df = self._linearity().copy()
 
         if zeroed:
-            df["zero"] = df["sensor_name"].map(self.zeroes["zero"])
+            df["zero"] = df["sensor_name"].map(self.zeroes)
             df["angle"] = df["angle"] - df["zero"]
+            df.drop("zero", axis=1, inplace=True)
+            round_column(df, "angle", self.set_angles)
 
         if series:
             df["series"] = df["sensor_name"].map(self.series_mapping)
-            round_column(df, "angle", self.set_angles)
-            new_df = df.groupby(["series", "angle"]).mean()[["mean_raw"]].reset_index()
-            new_df["max_raw"] = df.groupby(["series", "angle"]).max()[["mean_raw"]].reset_index()["mean_raw"]
-            new_df["min_raw"] = df.groupby(["series", "angle"]).min()[["mean_raw"]].reset_index()["mean_raw"]
-            df = new_df
+            gb = df.groupby(["series", "angle"])
+            df = gb["mean_raw"].mean().to_frame()
+            df["max_raw"] = gb["max_raw"].max()
+            df["min_raw"] = gb["min_raw"].min()
+        else:
+            df.set_index(['angle', 'sensor_name'], inplace=True)
 
         return df
 
-    @st.cache
+    @st.cache(ttl=60)
     def _repeatability(self) -> pd.DataFrame:
         db = mongo_tilt_db()
 
@@ -451,12 +432,12 @@ class SensorData:
             {
                 '$group': {
                     '_id': {
-                        'angle': '$stage_data.set_angle', 
+                        'angle': '$stage_data.set_angle',
                         'sensor_name': '$sensor_name'
-                    }, 
+                    },
                     'max_degrees': {
                         '$max': '$sensor_data.degrees'
-                    }, 
+                    },
                     'min_degrees': {
                         '$min': '$sensor_data.degrees'
                     }
@@ -494,7 +475,7 @@ class SensorData:
         df = self._repeatability().copy()
 
         if zeroed:
-            df["zero"] = df["sensor_name"].map(self.zeroes["zero"])
+            df["zero"] = df["sensor_name"].map(self.zeroes)
             df["angle"] = df["angle"] - df["zero"]
 
         if series:
@@ -505,10 +486,11 @@ class SensorData:
             new_df["max_repeatability"] = df.groupby(["series", "angle"]).max()[["repeatability"]].reset_index()["repeatability"]
             new_df["min_repeatability"] = df.groupby(["series", "angle"]).min()[["repeatability"]].reset_index()["repeatability"]
             df = new_df
-        
+
         return df
 
     @property
+    @st.cache(ttl=60)
     def accuracy(self) -> pd.DataFrame:
         db = mongo_tilt_db()
 
@@ -528,18 +510,18 @@ class SensorData:
             }, {
                 '$group': {
                     '_id': {
-                        'angle': '$stage_data.set_angle', 
+                        'angle': '$stage_data.set_angle',
                         'sensor_name': '$sensor_name'
-                    }, 
+                    },
                     'max_error': {
                         '$max': '$error'
-                    }, 
+                    },
                     'min_error': {
                         '$min': '$error'
-                    }, 
+                    },
                     'mean_error': {
                         '$avg': '$error'
-                    }, 
+                    },
                     'dev_error': {
                         '$stdDevSamp': '$error'
                     }
@@ -552,5 +534,5 @@ class SensorData:
         )))
         df.info()
         df = df.drop('_id', axis=1).join(pd.DataFrame(df['_id'].tolist()))
-        
+
         return df
