@@ -1,10 +1,12 @@
 import streamlit as st
+from streamlit_extras.app_logo import add_logo
 
 st.set_page_config(
     page_title="Tilt Testing Results Dashboard",
-    page_icon=":wave:",
+    page_icon="https://frederickscompany.com/wp-content/uploads/2017/08/F_logo_082017-e1502119400827.png",
 )
 
+add_logo("https://frederickscompany.com/wp-content/uploads/2017/08/F_logo_082017-e1502119400827.png")
 st.write("# Welcome to the Tilt Testing Results Dashboard")
 st.sidebar.success("Select a page above to get started")
 st.write("## About")

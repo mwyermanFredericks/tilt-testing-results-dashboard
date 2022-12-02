@@ -9,7 +9,7 @@ from results_dashboard.sidebar import show_sidebar
 
 st.set_page_config(
     page_title="Data Over Time",
-    page_icon=":line_chart:",
+    page_icon="https://frederickscompany.com/wp-content/uploads/2017/08/F_logo_082017-e1502119400827.png",
         )
 
 data = show_sidebar()
