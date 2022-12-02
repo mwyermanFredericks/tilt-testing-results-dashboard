@@ -1,5 +1,6 @@
 import traceback
 
+import numpy as np
 import streamlit as st
 import altair as alt
 from sklearn.linear_model import LinearRegression
@@ -57,12 +58,12 @@ if linear_range > 0:
 lindf = pd.DataFrame(index=df.index)
 for sensor in df.index.get_level_values("sensor_name").unique():
     mask = df.index.get_level_values("sensor_name") == sensor
-    x = df.loc[mask, "mean_raw"].to_numpy().reshape(-1, 1)
+    x = df.loc[mask, "mean_raw"].to_frame()
     y = df.loc[mask].index.to_frame()["angle"]
     reg = LinearRegression().fit(x, y)
     lindf.loc[mask, "mean_residual"] = reg.predict(df.loc[mask, ["mean_raw"]]) - df.loc[mask].index.to_frame()["angle"]
-    lindf.loc[mask, "max_residual"] = reg.predict(df.loc[mask, ["max_raw"]]) - df.loc[mask].index.to_frame()["angle"]
-    lindf.loc[mask, "min_residual"] = reg.predict(df.loc[mask, ["min_raw"]]) - df.loc[mask].index.to_frame()["angle"]
+    lindf.loc[mask, "max_residual"] = reg.predict(df.loc[mask, ["max_raw"]].rename(columns={"max_raw": "mean_raw"})) - df.loc[mask].index.to_frame()["angle"]
+    lindf.loc[mask, "min_residual"] = reg.predict(df.loc[mask, ["min_raw"]].rename(columns={"min_raw": "mean_raw"})) - df.loc[mask].index.to_frame()["angle"]
 
 sensors = st.selectbox("Select a sensor", ["All"] + data.sensor_names, key="linearity_sensor")
 if sensors != "All":
@@ -104,9 +105,8 @@ if linear_range > 0:
 
 
 if sensors != "All":
-    x = df.droplevel("sensor_name").index.to_frame()[["angle"]]
-    y = df[["mean_raw"]]
-    y.index = y.index.droplevel("sensor_name")
+    x = df.index.to_frame()[["angle"]]
+    y = np.array(df["mean_raw"]).reshape(-1, 1)
     reg = LinearRegression().fit(x, y)
     r2 = reg.score(x, y)
 
@@ -138,8 +138,7 @@ st.write("""
 """)
 
 if sensors != "All":
-    snlindf = lindf.xs(sensors, level="sensor_name")
-    snlindf["sensor_name"] = sensors
+    snlindf = lindf.xs(sensors, level="sensor_name", drop_level=False)
 else:
     snlindf = lindf
 
@@ -211,15 +210,14 @@ if linear_range > 0:
     df = df[(df.index.get_level_values("angle") <= linear_range) & (df.index.get_level_values("angle") >= -linear_range)]
 
 if groups != "All":
-    df = df.xs(groups, level="series")
-    df["series"] = groups
+    df = df.xs(groups, level="series", drop_level=False)
 
 chart = (
     alt.Chart(df.reset_index())
     .mark_line()
     .encode(
         x=alt.X("angle", title="Angle (deg)"),
-        y=alt.Y("mean_raw", title="Raw Output"),
+        y=alt.Y("mean_raw", title="Raw Output", scale=alt.Scale(zero=False)),
         color=alt.Color("series", title="Sensor Group"),
     )
 )
@@ -229,8 +227,8 @@ if linear_range > 0:
     title += f" (+/-{linear_range} deg)"
 
 if groups != "All":
-    x = df.index.to_frame()
-    y = df[["mean_raw"]]
+    x = np.array(df.index.to_frame()["angle"]).reshape(-1, 1)
+    y = np.array(df["mean_raw"]).reshape(-1, 1)
     reg = LinearRegression().fit(x, y)
     r2 = reg.score(x, y)
 
@@ -281,8 +279,7 @@ lindf["max_residual"] = group_by["max_residual"].max()
 lindf["min_residual"] = group_by["min_residual"].min()
 
 if groups != "All":
-    gplindf = lindf.xs(groups, level="series")
-    gplindf["series"] = groups
+    gplindf = lindf.xs(groups, level="series", drop_level=False)
 else:
     gplindf = lindf
 
