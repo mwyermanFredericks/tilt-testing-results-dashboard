@@ -7,7 +7,10 @@ from results_dashboard.data.mongo import mongo_tilt_db
 
 # Sidebar/Multipage
 
-st.set_page_config(page_title="Raw Data")
+st.set_page_config(
+    page_title="Raw Data",
+    page_icon="https://frederickscompany.com/wp-content/uploads/2017/08/F_logo_082017-e1502119400827.png",
+)
 
 data = show_sidebar()
 
