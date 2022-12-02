@@ -51,13 +51,24 @@ except KeyError:
 if linear_range > 0:
     df = df[(df.index.get_level_values("angle") <= linear_range) & (df.index.get_level_values("angle") >= -linear_range)]
 
+# create lindf now so we have all sensor data in it
+# this way it will be available for the sensor group
+# section even if the sensor itself has a filter
+lindf = pd.DataFrame(index=df.index)
+for sensor in df.index.get_level_values("sensor_name").unique():
+    mask = df.index.get_level_values("sensor_name") == sensor
+    x = df.loc[mask, "mean_raw"].to_numpy().reshape(-1, 1)
+    y = df.loc[mask].index.to_frame()["angle"]
+    reg = LinearRegression().fit(x, y)
+    lindf.loc[mask, "mean_residual"] = reg.predict(df.loc[mask, ["mean_raw"]]) - df.loc[mask].index.to_frame()["angle"]
+    lindf.loc[mask, "max_residual"] = reg.predict(df.loc[mask, ["max_raw"]]) - df.loc[mask].index.to_frame()["angle"]
+    lindf.loc[mask, "min_residual"] = reg.predict(df.loc[mask, ["min_raw"]]) - df.loc[mask].index.to_frame()["angle"]
 
 sensors = st.selectbox("Select a sensor", ["All"] + data.sensor_names, key="linearity_sensor")
 if sensors != "All":
     df = df.xs(sensors, level="sensor_name")
     df["sensor_name"] = sensors
     df = df.reset_index().set_index(["sensor_name", "angle"])
-
 
 avg_chart = (
     alt.Chart(df.reset_index())
@@ -67,7 +78,7 @@ avg_chart = (
         y=alt.Y("mean_raw", title="Raw Output", scale=alt.Scale(zero=False)),
         color=alt.Color("sensor_name", title="Sensor"),
     )
-) 
+)
 area_chart = (
     alt.Chart(df.reset_index())
     .mark_area(opacity=0.3)
@@ -87,23 +98,19 @@ area_chart = (
     )
 )
 
-
 title = "Linearity"
 if linear_range > 0:
     title += f" (+/-{linear_range} deg)"
+
 
 if sensors != "All":
     x = df.droplevel("sensor_name").index.to_frame()[["angle"]]
     y = df[["mean_raw"]]
     y.index = y.index.droplevel("sensor_name")
-    st.write(type(x))
-    st.write(x)
-    st.write(type(y))
-    st.write(y)
     reg = LinearRegression().fit(x, y)
     r2 = reg.score(x, y)
 
-    linregr_df = pd.DataFrame({"angle": [df.index.min(), df.index.max()]})
+    linregr_df = pd.DataFrame({"angle": [df.index.get_level_values("angle").min(), df.index.get_level_values("angle").max()]})
     linregr_df["mean_raw"] = reg.predict(linregr_df[["angle"]])
 
     # calculate linear line of best fit
@@ -130,19 +137,15 @@ st.write("""
     fit line.
 """)
 
-lindf = pd.DataFrame(index=df.index)
-for sensor in df.index.get_level_values("sensor_name").unique():
-    mask = df.index.get_level_values("sensor_name") == sensor
-    x = df.loc[mask, "mean_raw"].to_numpy().reshape(-1, 1)
-    y = df.loc[mask].index.to_frame()["angle"]
-    reg = LinearRegression().fit(x, y)
-    lindf.loc[mask, "mean_residual"] = reg.predict(df.loc[mask, ["mean_raw"]]) - df.loc[mask].index.to_frame()["angle"]
-    lindf.loc[mask, "max_residual"] = reg.predict(df.loc[mask, ["max_raw"]]) - df.loc[mask].index.to_frame()["angle"]
-    lindf.loc[mask, "min_residual"] = reg.predict(df.loc[mask, ["min_raw"]]) - df.loc[mask].index.to_frame()["angle"]
+if sensors != "All":
+    snlindf = lindf.xs(sensors, level="sensor_name")
+    snlindf["sensor_name"] = sensors
+else:
+    snlindf = lindf
 
 avg_chart = (
-    alt.Chart(lindf.reset_index())
-    .mark_line()
+    alt.Chart(snlindf.reset_index())
+    .mark_line() 
     .encode(
         x=alt.X("angle", title="Angle (deg)"),
         y=alt.Y("mean_residual", title="Residual"),
@@ -150,7 +153,7 @@ avg_chart = (
     )
 ) 
 area_chart = (
-    alt.Chart(lindf.reset_index())
+    alt.Chart(snlindf.reset_index())
     .mark_area(opacity=0.3)
     .encode(
         alt.X("angle", title="Angle (deg)"),
@@ -228,13 +231,8 @@ if linear_range > 0:
 if groups != "All":
     x = df.index.to_frame()
     y = df[["mean_raw"]]
-    st.write(type(x))
-    st.write(x)
-    st.write(type(y))
-    st.write(y)
     reg = LinearRegression().fit(x, y)
     r2 = reg.score(x, y)
-    st.write(f"R-squared: {r2:.5f}")
 
     # calculate linear line of best fit
     chart += (
@@ -270,7 +268,6 @@ chart = chart.properties(title=title)
 
 st.altair_chart(chart.interactive(), use_container_width=True)
 
-
 st.write("#### Residual Values")
 st.write("""
     This graph shows the error for each sensor from the linear best
@@ -283,8 +280,14 @@ lindf = group_by["mean_residual"].mean().to_frame()
 lindf["max_residual"] = group_by["max_residual"].max()
 lindf["min_residual"] = group_by["min_residual"].min()
 
+if groups != "All":
+    gplindf = lindf.xs(groups, level="series")
+    gplindf["series"] = groups
+else:
+    gplindf = lindf
+
 avg_chart = (
-    alt.Chart(lindf.reset_index())
+    alt.Chart(gplindf.reset_index())
     .mark_line()
     .encode(
         x=alt.X("angle", title="Angle (deg)"),
@@ -293,7 +296,7 @@ avg_chart = (
     )
 ) 
 area_chart = (
-    alt.Chart(lindf.reset_index())
+    alt.Chart(gplindf.reset_index())
     .mark_area(opacity=0.3)
     .encode(
         alt.X("angle", title="Angle (deg)"),

@@ -26,7 +26,15 @@ def round_column(df: pd.DataFrame, column: str, round_to: List[float]) -> pd.Ser
         else:
             ret = lo
 
+        if pd.isna(ret):
+            print(f"Error: value {value} resulted in NaN - lo: {lo} [{lodiff}], hi: {hi} [{hidiff}]")
+        
         return ret
+
+    # extend list to prevent nan's when out of range
+    round_to_lo = [x + (min(round_to)* 2) for x in round_to]
+    round_to_hi = [x + (max(round_to)* 2) for x in round_to]
+    round_to = round_to_lo[:-1] + round_to + round_to_hi[1:]
 
     df[column] = df[column].map(lambda x: round_to_nearest(x, round_to))
 
