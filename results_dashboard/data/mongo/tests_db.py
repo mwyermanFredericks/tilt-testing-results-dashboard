@@ -7,14 +7,27 @@ from . import mongo_tilt_db
 @st.cache(ttl=60)
 def get_tests(series=None):
     db = mongo_tilt_db()
-    filter = {}
-    if series is not None:
-        filter = {"test_series": series}
-    sort = list({"test_start_time": -1}.items())
-    test_df = pd.DataFrame(list(db["test"].find(filter=filter, sort=sort)))
-
+    aggregate_query = [
+        {"$sort": {"test_start_time": -1}},
+        {
+            "$project": {
+                "label": {
+                    "$concat": [
+                        "$name",
+                        "-",
+                        {
+                            "$dateToString": {
+                                "date": "$test_start_time",
+                                "format": "%m/%d/%Y-%H:%M:%S"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+    test_df = pd.DataFrame(list(db["test"].aggregate(aggregate_query)))
     test_df["_id"] = test_df["_id"].astype(str)
-
     return test_df
 
 

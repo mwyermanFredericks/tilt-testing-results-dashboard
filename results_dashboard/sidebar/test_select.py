@@ -33,24 +33,20 @@ def show_test_list_sidebar() -> None:
 
 def get_test_selection_generic(namespace) -> list[str]:
     test_list = tests_db.get_tests()
-    selectable_test_names = {
-        f"{i[0]}-{i[2].strftime('%m/%d/%Y-%H:%M:%S')}": i[1]
-        for i in list(zip(test_list.name, test_list._id, test_list.test_start_time))
-    }
     try:
         test_selection = namespace.multiselect(
             "Select Test(s)",
-            list(selectable_test_names.keys()),
+            list(test_list["label"]),
             default=st.session_state["test_selection"],
             key="test_selection",
         )
     except KeyError:
         test_selection = namespace.multiselect(
             "Select Test(s)",
-            list(selectable_test_names.keys()),
+            list(test_list["label"]),
             key="test_selection",
         )
-    selected_ids = [selectable_test_names[i] for i in test_selection]
+    selected_ids = test_list.loc[test_list["label"].isin(test_selection), "_id"].tolist()
     return selected_ids
 
 
