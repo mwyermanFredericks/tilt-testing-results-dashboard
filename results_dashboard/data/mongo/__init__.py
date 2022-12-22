@@ -1,8 +1,9 @@
-from pymongo import MongoClient
 import streamlit as st
+from pymongo import MongoClient
 
 username = st.secrets["mongo_username"]
 password = st.secrets["mongo_password"]
+
 
 def mongo_tilt_db():
     client = MongoClient(
