@@ -1,13 +1,12 @@
 import traceback
 
-import numpy as np
-import streamlit as st
 import altair as alt
-from sklearn.linear_model import LinearRegression
+import numpy as np
 import pandas as pd
+import streamlit as st
+from sklearn.linear_model import LinearRegression
 
 from results_dashboard.sidebar import show_sidebar
-
 
 st.set_page_config(
     page_title="Linearity",
@@ -17,24 +16,30 @@ st.set_page_config(
 data = show_sidebar()
 st.sidebar.write("### Linearity Options")
 zeroed = st.sidebar.checkbox("Use zeroed values", value=True, key="zeroed")
-linear_range = st.sidebar.number_input("Linear Range", value=0.0, key="linear_range", step=0.1, format="%f")
+linear_range = st.sidebar.number_input(
+    "Linear Range", value=0.0, key="linear_range", step=0.1, format="%f"
+)
 
 st.write("# Linearity")
-st.write("""
+st.write(
+    """
         Linearity is a measure of how linear the sensor's raw output is relative
         to the angle of tilt.
-        """)
+        """
+)
 
 # By Sensor
 
 st.write("### By Sensor")
-st.write("""
+st.write(
+    """
         The following plots show the linearity of each sensor.
 
         Individual sensors can be selected using the dropdown menu.
         If a sensor is selected, the plot will show the linear best fit line,
         as well as a calculated R-squared value.
-        """)
+        """
+)
 
 if data.empty:
     st.warning("No data to display")
@@ -50,7 +55,10 @@ except KeyError:
     df = data.linearity(False)
 
 if linear_range > 0:
-    df = df[(df.index.get_level_values("angle") <= linear_range) & (df.index.get_level_values("angle") >= -linear_range)]
+    df = df[
+        (df.index.get_level_values("angle") <= linear_range)
+        & (df.index.get_level_values("angle") >= -linear_range)
+    ]
 
 # create lindf now so we have all sensor data in it
 # this way it will be available for the sensor group
@@ -61,11 +69,21 @@ for sensor in df.index.get_level_values("sensor_name").unique():
     x = df.loc[mask, "mean_raw"].to_frame()
     y = df.loc[mask].index.to_frame()["angle"]
     reg = LinearRegression().fit(x, y)
-    lindf.loc[mask, "mean_residual"] = reg.predict(df.loc[mask, ["mean_raw"]]) - df.loc[mask].index.to_frame()["angle"]
-    lindf.loc[mask, "max_residual"] = reg.predict(df.loc[mask, ["max_raw"]].rename(columns={"max_raw": "mean_raw"})) - df.loc[mask].index.to_frame()["angle"]
-    lindf.loc[mask, "min_residual"] = reg.predict(df.loc[mask, ["min_raw"]].rename(columns={"min_raw": "mean_raw"})) - df.loc[mask].index.to_frame()["angle"]
+    lindf.loc[mask, "mean_residual"] = (
+        reg.predict(df.loc[mask, ["mean_raw"]]) - df.loc[mask].index.to_frame()["angle"]
+    )
+    lindf.loc[mask, "max_residual"] = (
+        reg.predict(df.loc[mask, ["max_raw"]].rename(columns={"max_raw": "mean_raw"}))
+        - df.loc[mask].index.to_frame()["angle"]
+    )
+    lindf.loc[mask, "min_residual"] = (
+        reg.predict(df.loc[mask, ["min_raw"]].rename(columns={"min_raw": "mean_raw"}))
+        - df.loc[mask].index.to_frame()["angle"]
+    )
 
-sensors = st.selectbox("Select a sensor", ["All"] + data.sensor_names, key="linearity_sensor")
+sensors = st.selectbox(
+    "Select a sensor", ["All"] + data.sensor_names, key="linearity_sensor"
+)
 if sensors != "All":
     df = df.xs(sensors, level="sensor_name")
     df["sensor_name"] = sensors
@@ -110,7 +128,14 @@ if sensors != "All":
     reg = LinearRegression().fit(x, y)
     r2 = reg.score(x, y)
 
-    linregr_df = pd.DataFrame({"angle": [df.index.get_level_values("angle").min(), df.index.get_level_values("angle").max()]})
+    linregr_df = pd.DataFrame(
+        {
+            "angle": [
+                df.index.get_level_values("angle").min(),
+                df.index.get_level_values("angle").max(),
+            ]
+        }
+    )
     linregr_df["mean_raw"] = reg.predict(linregr_df[["angle"]])
 
     # calculate linear line of best fit
@@ -120,7 +145,7 @@ if sensors != "All":
         .encode(
             alt.X("angle", title="Angle (deg)"),
             alt.Y("mean_raw", title="Regression"),
-            alt.Color(legend=None)
+            alt.Color(legend=None),
         )
     )
 
@@ -132,10 +157,12 @@ chart = (area_chart + avg_chart).properties(title=title)
 st.altair_chart(chart.interactive(), use_container_width=True)
 
 st.write("#### Residual Values")
-st.write("""
+st.write(
+    """
     This graph shows the error for each sensor from the linear best
     fit line.
-""")
+"""
+)
 
 if sensors != "All":
     snlindf = lindf.xs(sensors, level="sensor_name", drop_level=False)
@@ -144,13 +171,13 @@ else:
 
 avg_chart = (
     alt.Chart(snlindf.reset_index())
-    .mark_line() 
+    .mark_line()
     .encode(
         x=alt.X("angle", title="Angle (deg)"),
         y=alt.Y("mean_residual", title="Residual"),
         color=alt.Color("sensor_name", title="Sensor"),
     )
-) 
+)
 area_chart = (
     alt.Chart(snlindf.reset_index())
     .mark_area(opacity=0.3)
@@ -170,9 +197,7 @@ area_chart = (
 )
 
 # create a horizontal line at 0
-zero_line = (
-    alt.Chart(pd.DataFrame({"Spec": [0]})).mark_rule().encode(y="Spec")
-)
+zero_line = alt.Chart(pd.DataFrame({"Spec": [0]})).mark_rule().encode(y="Spec")
 
 
 chart = (zero_line + area_chart + avg_chart).properties(title="Residual Values")
@@ -180,11 +205,10 @@ chart = (zero_line + area_chart + avg_chart).properties(title="Residual Values")
 st.altair_chart(chart.interactive(), use_container_width=True)
 
 
-
-
 ############### By Group ###############
 st.write("### By Group")
-st.write("""
+st.write(
+    """
     The following plots show the linearity of each sensor group.
 
     Different sensor groups can be selected using the dropdown menu.
@@ -195,9 +219,12 @@ st.write("""
     all of the data for each sensor concatenated together. This may result
     in worst linearity results if the sensors do not have very similar
     raw outputs over the given range.
-    """)
+    """
+)
 
-groups = st.selectbox("Select a group", ["All"] + data.sensor_groups, key="linearity_group")
+groups = st.selectbox(
+    "Select a group", ["All"] + data.sensor_groups, key="linearity_group"
+)
 
 try:
     df = data.linearity(zeroed, series=True)
@@ -207,7 +234,10 @@ except KeyError:
     df = data.linearity(False, series=True)
 
 if linear_range > 0:
-    df = df[(df.index.get_level_values("angle") <= linear_range) & (df.index.get_level_values("angle") >= -linear_range)]
+    df = df[
+        (df.index.get_level_values("angle") <= linear_range)
+        & (df.index.get_level_values("angle") >= -linear_range)
+    ]
 
 if groups != "All":
     df = df.xs(groups, level="series", drop_level=False)
@@ -234,13 +264,10 @@ if groups != "All":
 
     # calculate linear line of best fit
     chart += (
-            chart
-            .transform_regression("angle", "mean_raw", method="linear")
-            .mark_line(strokeDash=[5, 5], color="red")
-            .encode(
-                alt.Color(legend=None)
-            )
-        )
+        chart.transform_regression("angle", "mean_raw", method="linear")
+        .mark_line(strokeDash=[5, 5], color="red")
+        .encode(alt.Color(legend=None))
+    )
     title += f" | R-squared: {r2:.5f}"
 
 chart += (
@@ -267,10 +294,12 @@ chart = chart.properties(title=title)
 st.altair_chart(chart.interactive(), use_container_width=True)
 
 st.write("#### Residual Values")
-st.write("""
+st.write(
+    """
     This graph shows the error for each sensor from the linear best
     fit line.
-""")
+"""
+)
 
 lindf["series"] = lindf.index.get_level_values("sensor_name").map(data.series_mapping)
 group_by = lindf.reset_index().groupby(["angle", "series"])
@@ -291,7 +320,7 @@ avg_chart = (
         y=alt.Y("mean_residual", title="Residual"),
         color=alt.Color("series", title="Sensor Group"),
     )
-) 
+)
 area_chart = (
     alt.Chart(gplindf.reset_index())
     .mark_area(opacity=0.3)
@@ -311,9 +340,7 @@ area_chart = (
 )
 
 # create a horizontal line at 0
-zero_line = (
-    alt.Chart(pd.DataFrame({"Spec": [0]})).mark_rule().encode(y="Spec")
-)
+zero_line = alt.Chart(pd.DataFrame({"Spec": [0]})).mark_rule().encode(y="Spec")
 
 
 chart = (zero_line + area_chart + avg_chart).properties(title="Residual Values")

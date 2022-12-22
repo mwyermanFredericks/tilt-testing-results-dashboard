@@ -5,6 +5,7 @@ from .data.mongo import tests_db
 from .graphs import accuracy, over_time, repeatability
 from .ui import samples, test_select
 
+
 def run():
     st.set_page_config(
         page_title="Tilt Testing Results Dashboard",
@@ -21,7 +22,6 @@ def run():
         automatically updated as they are added to the database.
         """
     )
-
 
     # selected_ids = test_select.display_test_section()
     #

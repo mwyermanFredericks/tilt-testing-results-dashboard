@@ -18,13 +18,13 @@ def get_tests(series=None):
                         {
                             "$dateToString": {
                                 "date": "$test_start_time",
-                                "format": "%m/%d/%Y-%H:%M:%S"
+                                "format": "%m/%d/%Y-%H:%M:%S",
                             }
-                        }
+                        },
                     ]
                 }
             }
-        }
+        },
     ]
     test_df = pd.DataFrame(list(db["test"].aggregate(aggregate_query)))
     test_df["_id"] = test_df["_id"].astype(str)

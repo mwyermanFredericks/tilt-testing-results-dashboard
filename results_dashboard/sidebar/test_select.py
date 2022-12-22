@@ -46,12 +46,15 @@ def get_test_selection_generic(namespace) -> list[str]:
             list(test_list["label"]),
             key="test_selection",
         )
-    selected_ids = test_list.loc[test_list["label"].isin(test_selection), "_id"].tolist()
+    selected_ids = test_list.loc[
+        test_list["label"].isin(test_selection), "_id"
+    ].tolist()
     return selected_ids
 
 
 def get_test_selection() -> list[str]:
     return get_test_selection_generic(st)
+
 
 def get_test_selection_sidebar() -> list[str]:
     return get_test_selection_generic(st.sidebar)

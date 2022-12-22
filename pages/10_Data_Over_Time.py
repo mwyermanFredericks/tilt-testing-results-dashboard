@@ -1,5 +1,5 @@
-import streamlit as st
 import altair as alt
+import streamlit as st
 
 from results_dashboard.data import SensorData
 from results_dashboard.data.mongo import tests_db
@@ -10,7 +10,7 @@ from results_dashboard.sidebar import show_sidebar
 st.set_page_config(
     page_title="Data Over Time",
     page_icon="https://frederickscompany.com/wp-content/uploads/2017/08/F_logo_082017-e1502119400827.png",
-        )
+)
 
 data = show_sidebar()
 
@@ -52,7 +52,6 @@ else:
 # Temperature over Time
 
 st.subheader("Temperature over Time")
-
 
 
 if data.empty:
