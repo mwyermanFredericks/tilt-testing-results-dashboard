@@ -8,7 +8,7 @@ from . import samples, test_select
 
 def show_sidebar() -> SensorData:
     add_logo(
-        "https://frederickscompany.com/wp-content/uploads/2017/08/F_logo_082017-e1502119400827.png"
+        "https://frederickscompany.com/wp-content/themes/fredericks2021/images/the-fredericks-company-logo-2021.png"
     )
     st.sidebar.write("### General Options")
     selected_ids = test_select.get_test_selection_sidebar()
