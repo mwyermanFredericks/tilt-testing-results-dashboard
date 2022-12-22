@@ -154,7 +154,7 @@ if sensors != "All":
 chart = (area_chart + avg_chart).properties(title=title)
 
 
-st.altair_chart(chart.interactive(), use_container_width=True)
+st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")
 
 st.write("#### Residual Values")
 st.write(
@@ -202,7 +202,7 @@ zero_line = alt.Chart(pd.DataFrame({"Spec": [0]})).mark_rule().encode(y="Spec")
 
 chart = (zero_line + area_chart + avg_chart).properties(title="Residual Values")
 
-st.altair_chart(chart.interactive(), use_container_width=True)
+st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")
 
 
 ############### By Group ###############
@@ -291,7 +291,7 @@ chart += (
 chart = chart.properties(title=title)
 
 
-st.altair_chart(chart.interactive(), use_container_width=True)
+st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")
 
 st.write("#### Residual Values")
 st.write(
@@ -345,4 +345,4 @@ zero_line = alt.Chart(pd.DataFrame({"Spec": [0]})).mark_rule().encode(y="Spec")
 
 chart = (zero_line + area_chart + avg_chart).properties(title="Residual Values")
 
-st.altair_chart(chart.interactive(), use_container_width=True)
+st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")

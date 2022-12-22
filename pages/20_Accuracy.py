@@ -54,14 +54,11 @@ if data.empty:
 else:
     if expected_accuracy is not None and expected_accuracy > 0:
         spec_chart = (
-            alt.Chart(pd.DataFrame({"Spec": [expected_accuracy]}))
-            .mark_rule()
-            .encode(y="Spec")
+            alt.Chart().mark_rule(color="green").encode(y=alt.datum(expected_accuracy))
         ) + (
-            alt.Chart(pd.DataFrame({"Spec": [-expected_accuracy]}))
-            .mark_rule()
-            .encode(y="Spec")
+            alt.Chart().mark_rule(color="green").encode(y=alt.datum(-expected_accuracy))
         )
+
     else:
         spec_chart = None
 
@@ -98,4 +95,4 @@ else:
     if spec_chart is not None:
         chart += spec_chart
 
-    st.altair_chart(chart.interactive(), use_container_width=True)
+    st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")

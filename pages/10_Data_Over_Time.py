@@ -47,7 +47,7 @@ else:
         .properties(title="Set Angle vs Time")
         .interactive()
     )
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, use_container_width=True, theme="streamlit")
 
 # Temperature over Time
 
@@ -79,4 +79,4 @@ else:
 
     chart = chart.properties(title="Temperature over Time").interactive()
 
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, use_container_width=True, theme="streamlit")

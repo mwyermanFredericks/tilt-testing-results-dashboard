@@ -87,7 +87,7 @@ else:
     if repeatability_expected > 0:
         chart += (
             alt.Chart(pd.DataFrame({"Spec": [repeatability_expected]}))
-            .mark_rule()
+            .mark_rule(color="green")
             .encode(y="Spec")
         )
 
@@ -98,13 +98,13 @@ else:
         )
         chart += (
             alt.Chart(pd.DataFrame({"Average": [average_repeatability]}))
-            .mark_rule()
+            .mark_rule(color="red")
             .encode(y="Average", color=alt.value("red"))
         )
     else:
         chart = chart.properties(title="Repeatability")
 
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(chart, use_container_width=True, theme="streamlit")
 
 
 # By Sensor Group
@@ -173,7 +173,7 @@ else:
     if repeatability_expected > 0:
         chart += (
             alt.Chart(pd.DataFrame({"Spec": [repeatability_expected]}))
-            .mark_rule()
+            .mark_rule(color="green")
             .encode(y="Spec")
         )
 
@@ -184,10 +184,10 @@ else:
         )
         chart += (
             alt.Chart(pd.DataFrame({"Average": [average_repeatability]}))
-            .mark_rule()
+            .mark_rule(color="red")
             .encode(y="Average", color=alt.value("red"))
         )
     else:
         chart = chart.properties(title="Sensor Group Repeatability")
 
-    st.altair_chart(chart.interactive(), use_container_width=True)
+    st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")
