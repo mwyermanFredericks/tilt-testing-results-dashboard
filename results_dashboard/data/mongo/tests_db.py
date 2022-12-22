@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from bson import ObjectId
 
 from . import mongo_tilt_db
 
@@ -35,17 +36,22 @@ def get_tests(series=None):
 def get_test_info(test_ids):
     db = mongo_tilt_db()
 
-    if isinstance(test_ids, str):
+    if isinstance(test_ids, str) or isinstance(test_ids, ObjectId):
         test_ids = [test_ids]
 
-    info = []
+    search_ids = []
     for test_id in test_ids:
-        test = db["test"].find_one(
-            {"_id": test_id},
-        )
-        info.append(test)
+        if isinstance(test_id, str):
+            search_ids.append(ObjectId(test_id))
+        else:
+            search_ids.append(test_id)
 
-    return info
+    cursor = db["test"].aggregate(
+        [{"$match": {"_id": {"$in": search_ids}}}, {"$unset": "test_info.steps"}]
+    )
+    results = list(cursor)
+
+    return results
 
 
 if __name__ == "__main__":
