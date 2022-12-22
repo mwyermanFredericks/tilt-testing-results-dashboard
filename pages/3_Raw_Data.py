@@ -18,6 +18,7 @@ data = show_sidebar()
 st.write("# Raw Data")
 
 
+@st.cache(show_spinner=False, max_entries=1)
 def load_raw_data(data: pd.DataFrame) -> pd.DataFrame:
     """Get raw data from the database"""
     db = mongo_tilt_db()
@@ -72,10 +73,12 @@ def load_raw_data(data: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+@st.cache(show_spinner=False, max_entries=1)
 def convert_sample_df(df):
     return df.to_csv().encode("utf-8")
 
 
+@st.cache(show_spinner=False, max_entries=1)
 def convert_rep_df(df):
     return df.to_csv().encode("utf-8")
 
@@ -84,32 +87,36 @@ st.write("## Samples")
 if data.empty:
     st.warning("No data available for selected tests")
 else:
-    df = load_raw_data(data)
+    if st.button("Get Raw Sample Data"):
+        with st.spinner("Loading data..."):
+            df = load_raw_data(data)
 
-    st.write(df)
+        st.write(df)
 
-    st.download_button(
-        label="Download as CSV",
-        data=convert_sample_df(df),
-        file_name="samples.csv",
-        mime="text/csv",
-    )
+        st.download_button(
+            label="Download as CSV",
+            data=convert_sample_df(df),
+            file_name="samples.csv",
+            mime="text/csv",
+        )
 #
 st.write("## Repeatability")
 if data.empty:
     st.warning("No data available for selected tests")
 else:
-    df = data.repeatability()
+    if st.button("Get Repeatability Data"):
+        with st.spinner("Loading data..."):
+            df = data.repeatability()
 
-    df.set_index(["angle", "sensor_name"], inplace=True)
-    df.index.names = ["angle", "sensor_name"]
-    df = df["repeatability"].unstack("sensor_name")
+        df.set_index(["angle", "sensor_name"], inplace=True)
+        df.index.names = ["angle", "sensor_name"]
+        df = df["repeatability"].unstack("sensor_name")
 
-    st.write(df)
-    csv = convert_rep_df(df)
-    st.download_button(
-        label="Download as CSV",
-        data=csv,
-        file_name="repeatability.csv",
-        mime="text/csv",
-    )
+        st.write(df)
+        csv = convert_rep_df(df)
+        st.download_button(
+            label="Download as CSV",
+            data=csv,
+            file_name="repeatability.csv",
+            mime="text/csv",
+        )
