@@ -143,4 +143,4 @@ with st.form("test_info"):
 
     submitted = st.form_submit_button("Update")
     if submitted:
-        pass
+        st.write(new_info)
