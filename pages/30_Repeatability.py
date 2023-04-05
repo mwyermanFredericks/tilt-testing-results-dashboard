@@ -76,7 +76,7 @@ else:
             y=alt.Y(
                 "repeatability",
                 title="Repeatability (deg)",
-                scale=alt.Scale(type="log"),
+                scale=alt.Scale(type="symlog", constant=0.0001),
             ),
             color="sensor_name",
             tooltip=["sensor_name", "angle", "repeatability"],
@@ -151,7 +151,7 @@ else:
             y=alt.Y(
                 "mean_repeatability",
                 title="Repeatability (deg)",
-                scale=alt.Scale(type="log"),
+                scale=alt.Scale(type="symlog", constant=0.0001),
             ),
             color=alt.Color("series", title="Sensor Group"),
         )

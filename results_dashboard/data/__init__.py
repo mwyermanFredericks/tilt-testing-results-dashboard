@@ -77,11 +77,11 @@ class SensorData:
         return query
 
     @property
-    @st.cache(ttl=60)
-    def angle_data(self) -> pd.DataFrame:
+    @st.cache_data(ttl=60)
+    def angle_data(_self) -> pd.DataFrame:
         db = mongo_tilt_db()
         aggregate_query = [
-            self._match_query,
+            _self._match_query,
             {
                 "$group": {
                     "_id": "$sample_time",
@@ -128,12 +128,12 @@ class SensorData:
         return df
 
     @property
-    @st.cache(ttl=60)
-    def temperature_data(self) -> pd.DataFrame:
+    @st.cache_data(ttl=60)
+    def temperature_data(_self) -> pd.DataFrame:
         db = mongo_tilt_db()
 
         aggregate_query = [
-            self._match_query,
+            _self._match_query,
             {
                 "$group": {
                     "_id": {
@@ -261,10 +261,10 @@ class SensorData:
         return pd.DataFrame(list(db["sample"].aggregate(aggregate_query)))
 
     @property
-    @st.cache(ttl=60)
-    def empty(self) -> bool:
+    @st.cache_data(ttl=60)
+    def empty(_self) -> bool:
         db = mongo_tilt_db()
-        return db["sample"].find_one(self._match_query["$match"]) is None
+        return db["sample"].find_one(_self._match_query["$match"]) is None
 
     # TODO
     @property
@@ -272,12 +272,12 @@ class SensorData:
         return get_test_info(self.test_ids)
 
     @property
-    @st.cache(ttl=60)
-    def sensor_names(self) -> list[str]:
-        if self.empty:
+    @st.cache_data(ttl=60)
+    def sensor_names(_self) -> list[str]:
+        if _self.empty:
             return []
         db = mongo_tilt_db()
-        return list(db["sample"].distinct("sensor_name", self._match_query["$match"]))
+        return list(db["sample"].distinct("sensor_name", _self._match_query["$match"]))
 
     @property
     def series_mapping(self) -> dict[str, str]:
@@ -292,20 +292,20 @@ class SensorData:
         return self.series
 
     @property
-    @st.cache(ttl=60)
-    def set_angles(self) -> pd.DataFrame:
-        if self.empty:
+    @st.cache_data(ttl=60)
+    def set_angles(_self) -> pd.DataFrame:
+        if _self.empty:
             return []
         db = mongo_tilt_db()
         vals = list(
-            db["sample"].distinct("stage_data.set_angle", self._match_query["$match"])
+            db["sample"].distinct("stage_data.set_angle", _self._match_query["$match"])
         )
         return [round(v, 6) for v in vals]
 
     @property
-    @st.cache(ttl=60)
-    def zeroes(self) -> pd.Series:
-        df = self._linearity()
+    @st.cache_data(ttl=60)
+    def zeroes(_self) -> pd.Series:
+        df = _self._linearity()
         df = df.loc[(df["mean_raw"] > 32768 - 6000) & (df["mean_raw"] < 32768 + 6000)]
         ser = (
             df.groupby("sensor_name")
@@ -317,12 +317,12 @@ class SensorData:
 
         return ser
 
-    @st.cache(ttl=60)
-    def _linearity(self) -> pd.DataFrame:
+    @st.cache_data(ttl=60)
+    def _linearity(_self) -> pd.DataFrame:
         db = mongo_tilt_db()
 
         aggregate_query = [
-            self._match_query,
+            _self._match_query,
             {
                 "$group": {
                     "_id": {
@@ -364,12 +364,12 @@ class SensorData:
 
         return df
 
-    @st.cache(ttl=60)
-    def _repeatability(self) -> pd.DataFrame:
+    @st.cache_data(ttl=60)
+    def _repeatability(_self) -> pd.DataFrame:
         db = mongo_tilt_db()
 
         aggregate_query = [
-            self._match_query,
+            _self._match_query,
             {
                 "$group": {
                     "_id": {
@@ -423,12 +423,12 @@ class SensorData:
         return df
 
     @property
-    @st.cache(ttl=60)
-    def accuracy(self) -> pd.DataFrame:
+    @st.cache_data(ttl=60)
+    def accuracy(_self) -> pd.DataFrame:
         db = mongo_tilt_db()
 
         aggregate_query = [
-            self._match_query,
+            _self._match_query,
             {
                 "$addFields": {
                     "error": {
