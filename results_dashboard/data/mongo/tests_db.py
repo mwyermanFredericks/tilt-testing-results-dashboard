@@ -22,7 +22,11 @@ def get_tests(series=None, object_ids=None):
                             }
                         },
                     ]
-                }
+                },
+                "progress": {
+                    "$divide": ["$status.steps_completed", "$status.total_steps"]
+                },
+                "rows_written": "$rows_written",
             }
         },
     ]
