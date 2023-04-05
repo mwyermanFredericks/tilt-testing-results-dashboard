@@ -1,9 +1,14 @@
+from typing import Literal
+
 import streamlit as st
 
 from ..data.mongo import tests_db
 
 
-def show_test_list_generic(test_list, namespace) -> None:
+def show_test_list_generic(
+    test_list,
+    namespace,
+) -> None:
     namespace.header("Test Selection")
     test_list = tests_db.get_tests()
     display_test_list = test_list.loc[
@@ -33,6 +38,7 @@ def show_test_list_sidebar() -> None:
 
 def get_test_selection_generic(namespace) -> list[str]:
     test_list = tests_db.get_tests()
+    test_list = test_list.loc[test_list["rows_written"] > 0, :]
     try:
         test_selection = namespace.multiselect(
             "Select Test(s)",
