@@ -261,10 +261,10 @@ class SensorData:
         return pd.DataFrame(list(db["sample"].aggregate(aggregate_query)))
 
     @property
-    @st.cache_data(ttl=60)
     def empty(_self) -> bool:
         db = mongo_tilt_db()
-        return db["sample"].find_one(_self._match_query["$match"]) is None
+        sample = db["sample"].find_one(_self._match_query["$match"])
+        return sample is None
 
     # TODO
     @property
