@@ -365,19 +365,27 @@ class SensorData:
         return df
 
     @st.cache_data(ttl=60)
-    def _repeatability(_self) -> pd.DataFrame:
+    def _repeatability(_self, dropped_rows: int) -> pd.DataFrame:
         db = mongo_tilt_db()
 
         aggregate_query = [
             _self._match_query,
+            {"$skip": dropped_rows},
+            {
+                "$project": {
+                    "angle": {"$round": ["$stage_data.set_angle", 6]},
+                    "degrees": "$sensor_data.degrees",
+                    "sensor_name": 1,
+                }
+            },
             {
                 "$group": {
                     "_id": {
-                        "angle": "$stage_data.set_angle",
+                        "angle": "$angle",
                         "sensor_name": "$sensor_name",
                     },
-                    "max_degrees": {"$max": "$sensor_data.degrees"},
-                    "min_degrees": {"$min": "$sensor_data.degrees"},
+                    "max_degrees": {"$max": "$degrees"},
+                    "min_degrees": {"$min": "$degrees"},
                 }
             },
             {
@@ -394,8 +402,10 @@ class SensorData:
         df = df.drop("_id", axis=1).join(pd.DataFrame(df["_id"].tolist()))
         return df
 
-    def repeatability(self, zeroed: bool = False, series: bool = False) -> pd.DataFrame:
-        df = self._repeatability().copy()
+    def repeatability(
+        self, zeroed: bool = False, series: bool = False, dropped_rows: int = 0
+    ) -> pd.DataFrame:
+        df = self._repeatability(dropped_rows=dropped_rows).copy()
 
         if zeroed:
             df["zero"] = df["sensor_name"].map(self.zeroes)
