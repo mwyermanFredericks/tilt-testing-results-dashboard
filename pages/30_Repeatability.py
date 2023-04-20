@@ -208,3 +208,72 @@ else:
         chart = chart.properties(title="Sensor Group Repeatability")
 
     st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")
+
+st.write("### Repeatability Characteristics")
+
+st.write(
+    """
+    This chart trys to help visualize the nature of the repeatability. This
+    will show the residual values of the repeatability over time in the  test.
+    The residual is calculated based on the sensor's average output at a
+    given angle. This should help to identify whether the repeatability is
+    due to a sensor's output drifting over time or if it is due to the
+    sensor's output being inconsistent.
+    """
+)
+
+
+if data.empty:
+    st.warning("No data to display")
+else:
+    df = data.repeatability_residuals()
+
+    sensors = st.selectbox(
+        "Select a sensor",
+        ["All"] + data.sensor_names,
+        key="repeatability_residual_sensor",
+    )
+
+    angles = data.set_angles
+    angle_range = st.slider(
+        "Angle Range",
+        min_value=angles[0],
+        max_value=angles[-1],
+        value=(angles[0], angles[-1]),
+        key="repeatability_residual_angle_range",
+    )
+
+    if sensors != "All":
+        df = df[df["sensor_name"] == sensors]
+
+    df = df[(df["set_angle"] >= angle_range[0]) & (df["set_angle"] <= angle_range[1])]
+
+    chart = (
+        alt.Chart(df)
+        .mark_line()
+        .encode(
+            x=alt.X("sample_time", title="Time"),
+            y=alt.Y("residual", title="Residual (deg)"),
+            color="sensor_name",
+            tooltip=[
+                "sensor_name",
+                "sample_time",
+                "sensor_degrees",
+                "residual",
+                "set_angle",
+            ],
+        )
+    )
+
+    if sensors != "All":
+        # chart = chart.properties(title=f"{sensors} Repeatability Residuals")
+        title = f"{sensors} Repeatability Residuals"
+    else:
+        # chart = chart.properties(title="Repeatability Residuals")
+        title = "Repeatability Residuals"
+
+    if angle_range[0] != angles[0] or angle_range[1] != angles[-1]:
+        title += f" | {angle_range[0]:.3f}° - {angle_range[1]:.3f}°"
+    chart = chart.properties(title=title)
+
+    st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")

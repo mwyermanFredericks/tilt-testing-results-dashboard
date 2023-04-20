@@ -432,6 +432,52 @@ class SensorData:
 
         return df
 
+    @st.cache_data(ttl=60)
+    def repeatability_residuals(_self) -> pd.DataFrame:
+        db = mongo_tilt_db()
+
+        aggregate_query = [
+            _self._match_query,
+            {
+                "$project": {
+                    "angle": {"$round": ["$stage_data.set_angle", 6]},
+                    "degrees": "$sensor_data.degrees",
+                    "sensor_name": 1,
+                    "sample_time": 1,
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "angle": "$angle",
+                        "sensor_name": "$sensor_name",
+                    },
+                    "avg_degrees": {"$avg": "$degrees"},
+                    "samples": {"$push": "$$ROOT"},
+                }
+            },
+            {"$unwind": "$samples"},
+            {
+                "$project": {
+                    "_id": "$samples._id",
+                    "sample_time": "$samples.sample_time",
+                    "sensor_name": "$samples.sensor_name",
+                    "set_angle": "$samples.angle",
+                    "sensor_degrees": "$samples.degrees",
+                    "residual": {
+                        "$subtract": [
+                            "$samples.degrees",
+                            "$avg_degrees",
+                        ]
+                    },
+                }
+            },
+        ]
+
+        df = pd.DataFrame(list(db["sample"].aggregate(aggregate_query)))
+        df = df.drop("_id", axis=1).join(pd.DataFrame(df["_id"].tolist()))
+        return df
+
     @property
     @st.cache_data(ttl=60)
     def accuracy(_self) -> pd.DataFrame:
