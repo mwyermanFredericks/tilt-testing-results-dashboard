@@ -371,13 +371,20 @@ class SensorData:
         aggregate_query = [
             _self._match_query,
             {
+                "$project": {
+                    "angle": {"$round": ["$stage_data.set_angle", 6]},
+                    "degrees": "$sensor_data.degrees",
+                    "sensor_name": 1,
+                }
+            },
+            {
                 "$group": {
                     "_id": {
-                        "angle": "$stage_data.set_angle",
+                        "angle": "$angle",
                         "sensor_name": "$sensor_name",
                     },
-                    "max_degrees": {"$max": "$sensor_data.degrees"},
-                    "min_degrees": {"$min": "$sensor_data.degrees"},
+                    "max_degrees": {"$max": "$degrees"},
+                    "min_degrees": {"$min": "$degrees"},
                 }
             },
             {

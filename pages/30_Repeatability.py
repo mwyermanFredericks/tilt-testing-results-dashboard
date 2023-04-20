@@ -60,7 +60,7 @@ else:
     )
 
     try:
-        df = data.repeatability(zeroed)
+        df = data.repeatability(zeroed=zeroed)
     except KeyError:
         st.warning("Zeroing error. Showing unzeroed values")
         df = data.repeatability()
@@ -135,7 +135,7 @@ else:
     )
 
     try:
-        df = data.repeatability(zeroed, series=True)
+        df = data.repeatability(zeroed=zeroed, series=True)
     except KeyError:
         st.warning("Zeroing error. Showing unzeroed values")
         df = data.repeatability(series=True)
