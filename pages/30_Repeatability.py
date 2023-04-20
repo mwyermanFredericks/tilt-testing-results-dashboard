@@ -273,7 +273,8 @@ else:
         title = "Repeatability Residuals"
 
     if angle_range[0] != angles[0] or angle_range[1] != angles[-1]:
-        title += f" | {angle_range[0]:.3f}° - {angle_range[1]:.3f}°"
+        # title += f" | {angle_range[0]}° - {angle_range[1]}°"
+        title += f" | {round(angle_range[0], 4)}° - {round(angle_range[1], 4)}°"
     chart = chart.properties(title=title)
 
     st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")
