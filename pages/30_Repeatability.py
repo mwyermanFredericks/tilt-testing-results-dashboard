@@ -48,6 +48,15 @@ st.write(
 
     If a single sensor is selected, the average repeatability is shown in
     the title and is drawn as a horizontal red line on the graph.
+
+    There is also an option to drop rows. This will drop the first n
+    rows from the data before calculating the repeatability. This can be
+    useful if there is an issue with the early samples that has a negative
+    impact on the repeatability. Note that a row is a single sample for a
+    single sensor. This means the number of rows to drop will vary depending
+    on the test parameters. For example, if the test contains 10 sensors and
+    takes 10 samples for each angle, 100 rows should be dropped to remove the
+    first angle step in the test.
         """
 )
 
@@ -59,11 +68,15 @@ else:
         "Select a sensor", ["All"] + data.sensor_names, key="repeatability_sensor"
     )
 
+    dropped_rows = st.number_input(
+        "Dropped Rows", value=0, key="repeatability_dropped_rows"
+    )
+
     try:
-        df = data.repeatability(zeroed=zeroed)
+        df = data.repeatability(zeroed=zeroed, dropped_rows=dropped_rows)
     except KeyError:
         st.warning("Zeroing error. Showing unzeroed values")
-        df = data.repeatability()
+        df = data.repeatability(dropped_rows=dropped_rows)
 
     if sensors != "All":
         df = df[df.sensor_name == sensors]
@@ -134,11 +147,15 @@ else:
         key="repeatability_sensor_group",
     )
 
+    dropped_rows = st.number_input(
+        "Dropped Rows", value=0, key="repeatability_sensor_group_dropped_rows"
+    )
+
     try:
-        df = data.repeatability(zeroed=zeroed, series=True)
+        df = data.repeatability(zeroed=zeroed, series=True, dropped_rows=dropped_rows)
     except KeyError:
         st.warning("Zeroing error. Showing unzeroed values")
-        df = data.repeatability(series=True)
+        df = data.repeatability(series=True, dropped_rows=dropped_rows)
 
     if sensor_groups != "All":
         df = df[df.series == sensor_groups]
