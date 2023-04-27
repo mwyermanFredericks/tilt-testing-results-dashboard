@@ -260,7 +260,7 @@ class SensorData:
             },
         ]
         df = pd.DataFrame(list(db["sample"].aggregate(aggregate_query)))
-        df = df.drop("_id", axis=1).join(pd.DataFrame(df["_id"].tolist()))
+        # df = df.drop("_id", axis=1).join(pd.DataFrame(df["_id"].tolist()))
         return df
 
     @property
@@ -464,7 +464,6 @@ class SensorData:
             {"$unwind": "$samples"},
             {
                 "$project": {
-                    "_id": "$samples._id",
                     "sample_time": "$samples.sample_time",
                     "sensor_name": "$samples.sensor_name",
                     "set_angle": "$samples.angle",
@@ -480,7 +479,6 @@ class SensorData:
         ]
 
         df = pd.DataFrame(list(db["sample"].aggregate(aggregate_query)))
-        df = df.drop("_id", axis=1).join(pd.DataFrame(df["_id"].tolist()))
         return df
 
     @property
