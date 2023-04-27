@@ -22,6 +22,12 @@ repeatability_expected = st.sidebar.number_input(
     step=0.0001,
     format="%f",
 )
+y_scale = st.sidebar.selectbox("Y-Axis Scale", ["linear", "log"])
+y_max = st.sidebar.number_input("Y-Axis Max", value=1.0, key="y_max", step=0.0001)
+if y_scale == "linear":
+    scale = alt.Scale(type="linear", domainMax=y_max)
+else:
+    scale = alt.Scale(type="symlog", constant=0.0001, domainMax=y_max)
 
 # Main content
 
@@ -89,7 +95,7 @@ else:
             y=alt.Y(
                 "repeatability",
                 title="Repeatability (deg)",
-                scale=alt.Scale(type="symlog", constant=0.0001),
+                scale=scale,
             ),
             color="sensor_name",
             tooltip=["sensor_name", "angle", "repeatability"],
@@ -168,7 +174,7 @@ else:
             y=alt.Y(
                 "mean_repeatability",
                 title="Repeatability (deg)",
-                scale=alt.Scale(type="symlog", constant=0.0001),
+                scale=scale,
             ),
             color=alt.Color("series", title="Sensor Group"),
         )
