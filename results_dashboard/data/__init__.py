@@ -124,6 +124,7 @@ class SensorData:
         ]
 
         df = pd.DataFrame(list(db["sample"].aggregate(aggregate_query)))
+        df = df.drop("_id", axis=1).join(pd.DataFrame(df["_id"].tolist()))
 
         return df
 
@@ -258,7 +259,9 @@ class SensorData:
                 }
             },
         ]
-        return pd.DataFrame(list(db["sample"].aggregate(aggregate_query)))
+        df = pd.DataFrame(list(db["sample"].aggregate(aggregate_query)))
+        # df = df.drop("_id", axis=1).join(pd.DataFrame(df["_id"].tolist()))
+        return df
 
     @property
     def empty(_self) -> bool:
@@ -309,7 +312,7 @@ class SensorData:
         df = df.loc[(df["mean_raw"] > 32768 - 6000) & (df["mean_raw"] < 32768 + 6000)]
         ser = (
             df.groupby("sensor_name")
-            .mean()
+            .mean(numeric_only=True)
             .reset_index()[["angle", "sensor_name"]]
             .set_index("sensor_name")["angle"]
         )
@@ -356,7 +359,7 @@ class SensorData:
         if series:
             df["series"] = df["sensor_name"].map(self.series_mapping)
             gb = df.groupby(["series", "angle"])
-            df = gb["mean_raw"].mean().to_frame()
+            df = gb["mean_raw"].mean(numeric_only=True).to_frame()
             df["max_raw"] = gb["max_raw"].max()
             df["min_raw"] = gb["min_raw"].min()
         else:
@@ -415,7 +418,9 @@ class SensorData:
             df["series"] = df["sensor_name"].map(self.series_mapping)
             round_column(df, "angle", self.set_angles)
             new_df = (
-                df.groupby(["series", "angle"]).mean()[["repeatability"]].reset_index()
+                df.groupby(["series", "angle"])
+                .mean(numeric_only=True)[["repeatability"]]
+                .reset_index()
             )
             new_df.rename(columns={"repeatability": "mean_repeatability"}, inplace=True)
             new_df["max_repeatability"] = (
@@ -459,7 +464,6 @@ class SensorData:
             {"$unwind": "$samples"},
             {
                 "$project": {
-                    "_id": "$samples._id",
                     "sample_time": "$samples.sample_time",
                     "sensor_name": "$samples.sensor_name",
                     "set_angle": "$samples.angle",
@@ -475,7 +479,6 @@ class SensorData:
         ]
 
         df = pd.DataFrame(list(db["sample"].aggregate(aggregate_query)))
-        df = df.drop("_id", axis=1).join(pd.DataFrame(df["_id"].tolist()))
         return df
 
     @property
