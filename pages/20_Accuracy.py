@@ -96,3 +96,43 @@ else:
         chart += spec_chart
 
     st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")
+
+    st.header("Accuracy (Vertically Zeroed)")
+    st.write(
+        "This chart is the same as the one above, but with the mean error "
+        "zeroed at 0° tilt. This is useful for removing potential "
+        "systematic errors and offsets from the chart."
+    )
+
+    chart = alt.Chart(df).mark_line().encode(
+        alt.X("angle", title="Set Angle (° tilt)"),
+        alt.Y(
+            "mean_error_zeroed",
+            title="Error (±° tilt)",
+            scale=scale,
+        ),
+        color=alt.Color(
+            "sensor_name",
+            title="Sensor",
+        ),
+    ) + alt.Chart(df).mark_area(opacity=0.3).encode(
+        alt.X("angle", title="Set Angle (° tilt)"),
+        alt.Y("max_error_zeroed", title="Error (±° tilt)"),
+        alt.Y2("min_error_zeroed"),
+        color=alt.Color(
+            "sensor_name",
+            title="Sensor",
+        ),
+        tooltip=[
+            alt.Tooltip("sensor_name", title="Sensor"),
+            alt.Tooltip("angle", title="Set Angle"),
+            alt.Tooltip("mean_error_zeroed", title="Mean Error"),
+            alt.Tooltip("max_error_zeroed", title="Maximum Error"),
+            alt.Tooltip("min_error_zeroed", title="Minimum Error"),
+        ],
+    )
+
+    if spec_chart is not None:
+        chart += spec_chart
+
+    st.altair_chart(chart.interactive(), use_container_width=True, theme="streamlit")
