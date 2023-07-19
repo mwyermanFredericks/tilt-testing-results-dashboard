@@ -5,28 +5,37 @@ from results_dashboard.data.mongo import mongo_tilt_db
 from results_dashboard.data.utils import get_match_query
 
 
-def get_div(app: Dash) -> html.Div:
+def initialize(app: Dash) -> list[dcc.Store]:
     @app.callback(
         Output("angle-data", "data"),
-        Input("test-ids", "value"),
+        Input("test-id", "value"),
     )
     def get_angle_data(
-        test_ids: list[str] | None, sensor_mask: list[str] | None = None
+        test_id: str | None, sensor_mask: list[str] | None = None
     ) -> pd.DataFrame:
-        print(test_ids)
         db = mongo_tilt_db()
+        test_ids = [test_id] if test_id else []
         aggregate_query = [
-            get_match_query(test_ids or [], sensor_mask),
+            # get test data
+            get_match_query(test_ids, sensor_mask),
+            # group stage data by sample time
             {
                 "$group": {
                     "_id": "$sample_time",
                     "stage_data": {"$first": "$stage_data"},
                 }
             },
+            # promote stage data to root
             {"$replaceRoot": {"newRoot": {"$mergeObjects": ["$$ROOT", "$stage_data"]}}},
+            # remove stage data
             {"$project": {"stage_data": 0}},
+            # round set angle to 5 decimal places
+            {"$set": {"set_angle": {"$round": ["$set_angle", 5]}}},
+            # sort by sample time
             {"$sort": {"_id": 1}},
+            # group by sample time
             {"$group": {"_id": 0, "document": {"$push": "$$ROOT"}}},
+            # add previous angle field to each document
             {
                 "$project": {
                     "documentAndPrevAngle": {
@@ -39,7 +48,9 @@ def get_div(app: Dash) -> html.Div:
                     }
                 }
             },
+            # unwind document and previous angle
             {"$unwind": {"path": "$documentAndPrevAngle"}},
+            # replace document with document and previous angle
             {
                 "$replaceWith": {
                     "$mergeObjects": [
@@ -48,21 +59,22 @@ def get_div(app: Dash) -> html.Div:
                     ]
                 }
             },
+            # get difference between set angle and previous angle
             {
                 "$set": {
                     "angle_difference": {"$subtract": ["$set_angle", "$prev_angle"]}
                 }
             },
+            # filter out documents where angle difference is 0
             {"$match": {"angle_difference": {"$ne": 0}}},
+            # remove previous angle and angle difference
             {"$project": {"prev_angle": 0, "angle_difference": 0}},
+            # create sample time field
             {"$set": {"sample_time": "$_id"}},
         ]
 
-        print(aggregate_query)
         db_response = list(db.sample.aggregate(aggregate_query))
-        print(len(db_response))
         data = pd.DataFrame(db_response)
-        print(data)
         return data.to_dict("records")
 
-    return html.Div([dcc.Store("angle-data")])
+    return [dcc.Store(id="angle-data", data=[])]

@@ -518,10 +518,10 @@
 
 #         return df
 
-from dash import Dash, html
+from dash import Dash, dcc
 
 from results_dashboard.data import angle_data
 
 
-def get_div(app: Dash) -> html.Div:
-    return html.Div([angle_data.get_div(app)])
+def initialize(app: Dash) -> list[dcc.Store]:
+    return [*angle_data.initialize(app)]
