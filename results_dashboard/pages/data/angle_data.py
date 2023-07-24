@@ -1,8 +1,9 @@
 import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
-from dash import Dash, Input, Output, callback, dcc, html
-from dash.exceptions import PreventUpdate
+from dash import Input, Output, callback, dash_table, dcc, html
+
+from results_dashboard.common_components import get_alert_from_data
 
 dash.register_page(__name__, path="/data/angle_data")
 
@@ -10,30 +11,7 @@ dash.register_page(__name__, path="/data/angle_data")
 layout = html.Div(
     [
         html.Div(
-            [
-                html.Div(
-                    [
-                        html.H3("Angle Data"),
-                        html.Div(
-                            children=[
-                                dbc.Alert(
-                                    children=[
-                                        "No data available. Select a test in the ",
-                                        dcc.Link(
-                                            "Test Selection",
-                                            href="/config",
-                                            className="alert-link",
-                                        ),
-                                        " page.",
-                                    ],
-                                    color="warning",
-                                ),
-                            ],
-                            id="angle-data-table",
-                        ),
-                    ],
-                ),
-            ]
+            id="angle-data-table",
         ),
     ]
 )
@@ -44,19 +22,32 @@ layout = html.Div(
     Input("angle-data", "data"),
 )
 def update_angle_data_table(data: pd.DataFrame | None) -> html.Div:
-    if data is None:
-        raise PreventUpdate
+    if (alert := get_alert_from_data(data)) is not None:
+        return alert
     df = pd.DataFrame.from_records(data)
-    if len(df) == 0:
-        raise PreventUpdate
+    df = df.drop(columns=["_id"])
 
-    table = dbc.Table(
-        [html.Tr([html.Th(col) for col in df.columns])]
-        + [
-            html.Tr([html.Td(df.iloc[i][col]) for col in df.columns])
-            for i in range(len(df))
+    table = dash_table.DataTable(
+        id="angle-data-table",
+        columns=[{"name": i, "id": i} for i in df.columns],
+        data=df.to_dict("records"),
+        style_cell={"textAlign": "left"},
+        style_header={
+            "backgroundColor": "rgb(230, 230, 230)",
+            "fontWeight": "bold",
+        },
+        style_data_conditional=[
+            {
+                "if": {"row_index": "odd"},
+                "backgroundColor": "rgb(248, 248, 248)",
+            },
         ],
-        bordered=True,
+        style_table={
+            "overflowX": "auto",
+            "overflowY": "auto",
+            "height": "80vh",
+            "padding": "10px",
+        },
     )
 
     download_button = dbc.Button(

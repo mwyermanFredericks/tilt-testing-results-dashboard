@@ -12,7 +12,12 @@ def initialize(app: Dash) -> list[dcc.Store]:
     )
     def get_angle_data(
         test_id: str | None, sensor_mask: list[str] | None = None
-    ) -> pd.DataFrame:
+    ) -> pd.DataFrame | None:
+        print("get_angle_data invoked with test_id: ", test_id)
+
+        if test_id is None:
+            return None
+
         db = mongo_tilt_db()
         test_ids = [test_id] if test_id else []
         aggregate_query = [

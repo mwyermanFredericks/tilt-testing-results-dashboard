@@ -3,29 +3,16 @@ import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
-from dash import Dash, Input, Output, callback, dcc, html
+from dash import Input, Output, State, callback, dcc, html
 from dash.exceptions import PreventUpdate
 
-dash.register_page(__name__, path="/over_time")
+from results_dashboard.common_components import get_alert_from_data
+
+dash.register_page(__name__, path="/over_time/angle")
 
 layout = html.Div(
     [
-        html.H3("Angle Over Time"),
         html.Div(
-            children=[
-                dbc.Alert(
-                    children=[
-                        "No data available. Select a test in the ",
-                        dcc.Link(
-                            "Test Selection",
-                            href="/config",
-                            className="alert-link",
-                        ),
-                        " page.",
-                    ],
-                    color="warning",
-                ),
-            ],
             id="angle-over-time-graph",
         ),
     ]
@@ -37,18 +24,9 @@ layout = html.Div(
     Input("angle-data", "data"),
 )
 def update_angle_over_time_graph(data: pd.DataFrame | None) -> html.Div:
-    if data is None:
-        raise PreventUpdate
+    if (alert := get_alert_from_data(data)) is not None:
+        return alert
     df = pd.DataFrame.from_records(data)
-    if len(df) == 0:
-        raise PreventUpdate
-    # fig = px.line(
-    #     df,
-    #     x="sample_time",
-    #     y="set_angle",
-    #     title="Angle Over Time",
-    # )
-    # return fig
     return html.Div(
         dcc.Graph(
             figure=go.Figure(
@@ -68,5 +46,5 @@ def update_angle_over_time_graph(data: pd.DataFrame | None) -> html.Div:
                     hovermode="closest",
                 ),
             ),
-        )
+        ),
     )

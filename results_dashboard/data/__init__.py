@@ -520,8 +520,8 @@
 
 from dash import Dash, dcc
 
-from results_dashboard.data import angle_data
+from results_dashboard.data import angle_data, repeatability_data
 
 
 def initialize(app: Dash) -> list[dcc.Store]:
-    return [*angle_data.initialize(app)]
+    return [*angle_data.initialize(app), *repeatability_data.initialize(app)]

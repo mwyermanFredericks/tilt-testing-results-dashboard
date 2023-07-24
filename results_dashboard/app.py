@@ -5,6 +5,12 @@ from dash import Dash, Input, Output, State, dcc, html
 
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], use_pages=True)
 
+
+stores = [
+    dcc.Store(id="test-id", storage_type="session"),
+]
+
+
 navbar = dbc.Navbar(
     dbc.Container(
         [
@@ -38,7 +44,10 @@ navbar = dbc.Navbar(
                             label="Data",
                             nav=True,
                         ),
-                        dbc.NavItem(dbc.NavLink("Over Time", href="/over_time")),
+                        dbc.NavItem(dbc.NavLink("Over Time", href="/over_time/angle")),
+                        dbc.NavItem(
+                            dbc.NavLink("Repeatability", href="/repeatability/sensor")
+                        ),
                     ],
                     className="ml-auto",
                     navbar=True,
@@ -68,9 +77,10 @@ def toggle_navbar_collapse(n, is_open):
 
 app.layout = html.Div(
     [
+        *data.initialize(app),
+        *stores,
         navbar,
         dash.page_container,
-        *data.initialize(app),
     ],
     style={"padding": "20px"},
 )

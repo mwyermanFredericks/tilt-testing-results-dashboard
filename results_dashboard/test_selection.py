@@ -1,11 +1,9 @@
 import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
-from dash import Input, Output, State, callback, html
+from dash import Input, Output, State, callback, dcc, html
 
 from results_dashboard.data.mongo import mongo_tilt_db
-
-dash.register_page(__name__, path="/config")
 
 
 def get_tests() -> pd.DataFrame:
@@ -38,30 +36,31 @@ def get_tests() -> pd.DataFrame:
     return test_df
 
 
-layout = html.Div(
+config_layout = html.Div(
     [
         html.H1("Configuration"),
         dbc.Select(
-            id="test-id-dropdown",
+            id="test-id",
             options=[
                 {"label": row["label"], "value": row["_id"]}
                 for _, row in get_tests().iterrows()
             ],
             value=None,
             placeholder="Select a test",
+            persistence=True,
+            persistence_type="session",
         ),
         dbc.Button("Reset Session", id="reset-session", n_clicks=0, color="danger"),
     ]
 )
 
 
-@callback(
-    Output("test-id", "value"),
-    Output("test-id-dropdown", "value"),
-    Input("test-id-dropdown", "value"),
-    State("test-id", "value"),
-)
-def update_test_id(test_id: str, current_value: str) -> tuple[str, str]:
-    if test_id is None:
-        return current_value, current_value
-    return test_id, test_id
+# @callback(
+#     Output("test-id", "value"),
+#     [Input("reset-session", "n_clicks")],
+# )
+# def reset_session(n_clicks: int) -> str | None:
+#     print("reset_session", n_clicks)
+#     if n_clicks > 0:
+#         return None
+#     return dash.no_update
