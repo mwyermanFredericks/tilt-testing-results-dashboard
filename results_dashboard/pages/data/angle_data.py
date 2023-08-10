@@ -63,12 +63,13 @@ def update_angle_data_table(data: pd.DataFrame | None) -> html.Div:
     )
 
 
-@callback(
-    Output("download-angle-data-csv", "data"),
-    Input("download-angle-data-button", "n_clicks"),
-    Input("angle-data", "data"),
-    prevent_initial_call=True,
-)
-def download_angle_data_csv(n_clicks: int, data: pd.DataFrame | None) -> object:
-    df = pd.DataFrame.from_records(data)
-    return dcc.send_data_frame(df.to_csv, filename="angle_data.csv")
+# @callback(
+#     Output("download-angle-data-csv", "data"),
+#     Input("download-angle-data-button", "n_clicks"),
+#     State("angle-data", "data"),
+#     prevent_initial_call=True,
+#     suppress_callback_exceptions=True,
+# )
+# def download_angle_data_csv(n_clicks: int, data: pd.DataFrame | None) -> object:
+#     df = pd.DataFrame.from_records(data)
+#     return dcc.send_data_frame(df.to_csv, filename="angle_data.csv")

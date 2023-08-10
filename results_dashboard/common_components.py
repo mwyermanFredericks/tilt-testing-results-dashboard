@@ -1,16 +1,11 @@
+import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
-from dash import dcc, html
+from dash import html
 
 select_test_alert = dbc.Alert(
     children=[
-        "No data available. Select a test from the ",
-        dcc.Link(
-            "Test Selection",
-            href="/config",
-            className="alert-link",
-        ),
-        " page.",
+        "No test is selected. Please select a test from the dropdown menu.",
     ],
     color="warning",
 )
@@ -29,8 +24,24 @@ def get_alert_from_data(data: pd.DataFrame | None) -> html.Div | None:
     return None
 
 
+def log_callback_trigger(callback_func):
+    def wrapper(*args, **kwargs):
+        ctx = dash.callback_context
+        s = f"Callback Function: {callback_func.__name__}"
+        s += f"\n  Triggered by: {ctx.triggered[0]['prop_id']}"
+        for arg in args:
+            s += f"\n  arg: {arg}"
+        for key, value in kwargs.items():
+            s += f"\n  kwarg: {key}={value}"
+        print(s)
+        return callback_func(*args, **kwargs)
+
+    return wrapper
+
+
 __all__ = [
     "select_test_alert",
     "no_data_alert",
-    "get_alert_from_data" "spinner",
+    "get_alert_from_data",
+    "log_callback_trigger",
 ]

@@ -1,20 +1,28 @@
 import pandas as pd
-from dash import Dash, Input, Output, dcc, html
+from dash import Dash, Input, Output, dcc
 
+from results_dashboard.cache_manager import CacheSingleton
+from results_dashboard.common_components import log_callback_trigger
 from results_dashboard.data.mongo import mongo_tilt_db
 from results_dashboard.data.utils import get_match_query
+
+cache = CacheSingleton()
 
 
 def initialize(app: Dash) -> list[dcc.Store]:
     @app.callback(
         Output("sensor-repeatability-data", "data"),
-        Input("test-id", "value"),
+        Input("test-id", "data"),
+        background=True,
+        manager=cache.background_callback_manager,
     )
+    @log_callback_trigger
     def get_sensor_repeatability_data(
         test_id: str | None, sensor_mask: list[str] | None = None
     ) -> pd.DataFrame | None:
         if test_id is None:
             return None
+
         db = mongo_tilt_db()
         test_ids = [test_id] if test_id else []
         aggregate_query = [

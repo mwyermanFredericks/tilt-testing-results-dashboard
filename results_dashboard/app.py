@@ -1,10 +1,22 @@
+import os
+
 import dash
 import dash_bootstrap_components as dbc
 import data
 from dash import Dash, Input, Output, State, dcc, html
 
-app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], use_pages=True)
+from results_dashboard.cache_manager import CacheSingleton
+from results_dashboard.common_components import log_callback_trigger
+from results_dashboard.test_selection import config_layout
 
+cache = CacheSingleton()
+
+app = Dash(
+    __name__,
+    external_stylesheets=[dbc.themes.BOOTSTRAP],
+    use_pages=True,
+    background_callback_manager=cache.background_callback_manager,
+)
 
 stores = [
     dcc.Store(id="test-id", storage_type="session"),
@@ -34,7 +46,7 @@ navbar = dbc.Navbar(
             dbc.Collapse(
                 dbc.Nav(
                     [
-                        dbc.NavItem(dbc.NavLink("Test Selection", href="/config")),
+                        dbc.NavItem(dbc.NavLink("Test Selection", id="show-offcanvas")),
                         dbc.DropdownMenu(
                             [
                                 dbc.DropdownMenuItem(
@@ -65,10 +77,23 @@ navbar = dbc.Navbar(
 
 
 @app.callback(
+    Output("config-offcanvas", "is_open"),
+    Input("show-offcanvas", "n_clicks"),
+    State("config-offcanvas", "is_open"),
+    prevent_initial_call=True,
+)
+@log_callback_trigger
+def toggle_config(n: int, is_open: bool) -> bool:
+    return not is_open
+
+
+@app.callback(
     Output("navbar-collapse", "is_open"),
     Input("navbar-toggler", "n_clicks"),
     State("navbar-collapse", "is_open"),
+    prevent_initial_call=True,
 )
+@log_callback_trigger
 def toggle_navbar_collapse(n, is_open):
     if n:
         return not is_open
@@ -80,6 +105,16 @@ app.layout = html.Div(
         *data.initialize(app),
         *stores,
         navbar,
+        dbc.Offcanvas(
+            [
+                config_layout,
+            ],
+            id="config-offcanvas",
+            title="Test Selection",
+            scrollable=True,
+            is_open=False,
+            style={"width": "50%"},
+        ),
         dash.page_container,
     ],
     style={"padding": "20px"},
@@ -87,4 +122,4 @@ app.layout = html.Div(
 
 
 if __name__ == "__main__":
-    app.run(debug=False)
+    app.run(debug=True, dev_tools_hot_reload=False)

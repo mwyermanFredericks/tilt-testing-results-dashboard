@@ -1,10 +1,7 @@
 import dash
-import dash_bootstrap_components as dbc
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objs as go
-from dash import Input, Output, State, callback, dcc, html
-from dash.exceptions import PreventUpdate
+from dash import Input, Output, callback, dcc, html
 
 from results_dashboard.common_components import get_alert_from_data
 
