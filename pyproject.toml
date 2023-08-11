@@ -6,14 +6,13 @@ authors = ["Max Wyerman <mwyerman@frederickscompany.com>"]
 readme = "README.md"
 packages = [{include = "results_dashboard"}]
 
+[tool.poetry.scripts]
+results-dashboard-container = "results_dashboard.app:docker_run"
+
 [tool.poetry.dependencies]
 python = "^3.10"
 pandas = "^1.5.0"
-streamlit = "^1.13.0"
-altair = "^4.2.0"
 pymongo = "^4.3.3"
-scikit-learn = "^1.1.3"
-streamlit-extras = "^0.2.4"
 dash = {extras = ["diskcache"], version = "^2.11.1"}
 dash-bootstrap-components = "^1.4.1"
 celery = "^5.3.1"

@@ -1,8 +1,6 @@
-import os
-
 import dash
 import dash_bootstrap_components as dbc
-import data
+from results_dashboard import data
 from dash import Dash, Input, Output, State, dcc, html
 
 from results_dashboard.cache_manager import CacheSingleton
@@ -121,5 +119,9 @@ app.layout = html.Div(
 )
 
 
+def docker_run() -> None:
+    app.run_server(host="0.0.0.0")
+
+
 if __name__ == "__main__":
-    app.run(debug=True, dev_tools_hot_reload=False)
+    app.run_server(debug=True, dev_tools_hot_reload=False)
